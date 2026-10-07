@@ -566,3 +566,126 @@ func TestAccountsPageHasQuotaPanel(t *testing.T) {
 		t.Error("page is missing the en quota copy")
 	}
 }
+
+func TestAccountsWindowsAction(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	upstream := httptest.NewServer(quotaFixtureHandler(t))
+	defer upstream.Close()
+
+	host := newAuthStubHost(t, map[string]string{
+		"commandcode-abc.json": `{"type":"commandcode","api_key":"user_test1234567890","base_url":"` + upstream.URL + `"}`,
+		"commandcode-def.json": `{"type":"commandcode","api_key":"user_test0987654321","base_url":"` + upstream.URL + `"}`,
+	})
+	// A removed credential must not produce a window entry.
+	if err := os.WriteFile(filepath.Join(host.dir, "commandcode-old.json.removed-1"), []byte(`{"type":"commandcode","api_key":"user_old123"}`), 0o600); err != nil {
+		t.Fatalf("write removed fixture: %v", err)
+	}
+
+	response := decodeManagement(t, mustFrame(t, accountAction("windows", nil, nil)))
+	var payload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Windows map[string]struct {
+				FiveHour *struct {
+					Key     string `json:"key"`
+					Percent int    `json:"percent"`
+				} `json:"five_hour"`
+				Weekly *struct {
+					Key string `json:"key"`
+				} `json:"weekly"`
+				Error string `json:"error"`
+			} `json:"windows"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body, &payload); err != nil {
+		t.Fatalf("windows body decode: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("windows action failed: %s", response.Body)
+	}
+	abc, ok := payload.Data.Windows["commandcode-abc.json"]
+	if !ok || abc.FiveHour == nil || abc.FiveHour.Key != "five_hour" || abc.FiveHour.Percent != 16 {
+		t.Fatalf("abc windows = %+v, want five_hour 16%%", abc)
+	}
+	if abc.Weekly == nil || abc.Weekly.Key != "weekly" {
+		t.Fatalf("abc weekly = %+v, want the weekly window", abc.Weekly)
+	}
+	if _, ok := payload.Data.Windows["commandcode-def.json"]; !ok {
+		t.Error("the second active account is missing from the batch")
+	}
+	if _, ok := payload.Data.Windows["commandcode-old.json.removed-1"]; ok {
+		t.Error("a removed credential produced a window entry")
+	}
+}
+
+func TestAccountsWindowsActionDegradesPerAccount(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	upstream := httptest.NewServer(quotaFixtureHandler(t))
+	defer upstream.Close()
+
+	dead := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer dead.Close()
+
+	newAuthStubHost(t, map[string]string{
+		"commandcode-abc.json":  `{"type":"commandcode","api_key":"user_test1234567890","base_url":"` + upstream.URL + `"}`,
+		"commandcode-dead.json": `{"type":"commandcode","api_key":"user_dead1234567890","base_url":"` + dead.URL + `"}`,
+	})
+
+	response := decodeManagement(t, mustFrame(t, accountAction("windows", nil, nil)))
+	var payload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Windows map[string]struct {
+				FiveHour *struct {
+					Key string `json:"key"`
+				} `json:"five_hour"`
+				Error string `json:"error"`
+			} `json:"windows"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body, &payload); err != nil {
+		t.Fatalf("windows body decode: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("a single broken account must not fail the batch: %s", response.Body)
+	}
+	if payload.Data.Windows["commandcode-abc.json"].FiveHour == nil {
+		t.Error("the healthy account lost its window")
+	}
+	if entry := payload.Data.Windows["commandcode-dead.json"]; entry.Error == "" {
+		t.Errorf("the broken account = %+v, want an error entry", entry)
+	}
+}
+
+func TestAccountsPageHasInlineWindows(t *testing.T) {
+	html := AccountsPageHTML("zh")
+	for _, want := range []string{"windows.className = 'windows'", "call('windows')", ".account .windows", "renderWindows"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+}
+
+func TestAccountsPageHasCallableKeys(t *testing.T) {
+	zh := AccountsPageHTML("zh")
+	for _, want := range []string{`id="callableList"`, `id="callableAdd"`, `call('keys')`, `call('key_add'`, "可调用密钥", "CPAMP 认证配置的 api-keys"} {
+		if !strings.Contains(zh, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+	en := AccountsPageHTML("en")
+	for _, want := range []string{"Callable keys", "call('key_delete'", "not in the CPAMP auth api-keys list"} {
+		if !strings.Contains(en, want) {
+			t.Errorf("en page is missing %q", want)
+		}
+	}
+	if !strings.Contains(zh, "'X-CommandCode-Callable-Key': key") {
+		t.Error("the page must send the callable key as a request header")
+	}
+}

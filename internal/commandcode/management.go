@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -57,6 +58,22 @@ type accountView struct {
 	RestoreName    string `json:"restore_name,omitempty"`
 }
 
+// windowsFetchTimeout bounds one account's window lookup inside the page's
+// batch call: the list must render even when a single upstream is slow.
+const windowsFetchTimeout = 15 * time.Second
+
+// windowsConcurrency bounds how many accounts are queried at once so a large
+// pool cannot burst the upstream account endpoints.
+const windowsConcurrency = 4
+
+// accountWindowsView is the compact window summary rendered under one account
+// item. A nil window is omitted (unreported stays unseen, mirroring the dialog).
+type accountWindowsView struct {
+	FiveHour *quotaWindowView `json:"five_hour,omitempty"`
+	Weekly   *quotaWindowView `json:"weekly,omitempty"`
+	Error    string           `json:"error,omitempty"`
+}
+
 // handleManagementRequest dispatches the plugin's resource endpoints.
 func handleManagementRequest(raw []byte) ([]byte, error) {
 	var req pluginapi.ManagementRequest
@@ -94,6 +111,17 @@ func handleManagementRequest(raw []byte) ([]byte, error) {
 			return jsonResponse(http.StatusOK, managementJSON{OK: false, Error: errFetch.Error()})
 		}
 		return jsonResponse(http.StatusOK, managementJSON{OK: true, Data: buildQuotaView(report)})
+
+	case action == "windows":
+		// Read-only, like the quota dialog: the card rows must not require the
+		// page-write switch. One slow account degrades to an {error} entry.
+		views, errList := listAccountViews()
+		if errList != nil {
+			return jsonResponse(http.StatusOK, managementJSON{OK: false, Error: errList.Error()})
+		}
+		return jsonResponse(http.StatusOK, managementJSON{OK: true, Data: map[string]any{
+			"windows": fetchAccountWindows(context.Background(), views, cfg),
+		}})
 
 	case action == "save":
 		return handleAccountSave(req, cfg, lang)
@@ -200,6 +228,73 @@ func listAccountViews() ([]accountView, error) {
 		return strings.ToLower(views[i].File) < strings.ToLower(views[j].File)
 	})
 	return views, nil
+}
+
+// fetchAccountWindows collects the 5h/weekly windows for every active account.
+// Failures are per account: the page shows "—" for the broken row instead of
+// failing the whole batch.
+func fetchAccountWindows(ctx context.Context, views []accountView, cfg RuntimeConfig) map[string]accountWindowsView {
+	out := map[string]accountWindowsView{}
+	var mu sync.Mutex
+	sem := make(chan struct{}, windowsConcurrency)
+	var wg sync.WaitGroup
+
+	for _, view := range views {
+		if view.Removed || strings.TrimSpace(view.AuthIndex) == "" {
+			continue
+		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(view accountView) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			result := accountWindowsView{}
+			account, errLoad := loadAccountForView(view)
+			if errLoad != nil {
+				result.Error = errLoad.Error()
+			} else {
+				reqCtx, cancel := context.WithTimeout(ctx, windowsFetchTimeout)
+				report, errFetch := FetchQuotaReport(reqCtx, account, cfg)
+				cancel()
+				if errFetch != nil {
+					result.Error = errFetch.Error()
+				} else {
+					if report.Credits.FiveHour != nil {
+						window := buildQuotaWindowView("five_hour", report.Credits.FiveHour)
+						result.FiveHour = &window
+					}
+					if report.Credits.Weekly != nil {
+						window := buildQuotaWindowView("weekly", report.Credits.Weekly)
+						result.Weekly = &window
+					}
+				}
+			}
+
+			mu.Lock()
+			out[view.File] = result
+			mu.Unlock()
+		}(view)
+	}
+	wg.Wait()
+	return out
+}
+
+// loadAccountForView resolves one listed credential through the host so the API
+// key never leaves the plugin.
+func loadAccountForView(view accountView) (Account, error) {
+	raw, errGet := accountRawJSON(view.AuthIndex)
+	if errGet != nil {
+		return Account{}, errGet
+	}
+	account, handled, errParse := ParseAccount(raw)
+	if errParse != nil {
+		return Account{}, errParse
+	}
+	if !handled {
+		return Account{}, fmt.Errorf("credential does not belong to the %s provider", ProviderID)
+	}
+	return account, nil
 }
 
 // lastAccountDir remembers the auth directory across a removal, because a
@@ -435,16 +530,9 @@ func loadAccountByFile(file string) (Account, string, error) {
 		if !strings.EqualFold(view.File, file) || view.AuthIndex == "" {
 			continue
 		}
-		raw, errGet := accountRawJSON(view.AuthIndex)
-		if errGet != nil {
-			return Account{}, file, errGet
-		}
-		account, handled, errParse := ParseAccount(raw)
-		if errParse != nil {
-			return Account{}, file, errParse
-		}
-		if !handled {
-			return Account{}, file, fmt.Errorf("credential does not belong to the %s provider", ProviderID)
+		account, errLoad := loadAccountForView(view)
+		if errLoad != nil {
+			return Account{}, file, errLoad
 		}
 		return account, view.File, nil
 	}
