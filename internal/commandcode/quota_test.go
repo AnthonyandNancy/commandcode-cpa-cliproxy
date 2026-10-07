@@ -237,3 +237,65 @@ func TestFetchQuotaReportUnknownPlan(t *testing.T) {
 		t.Errorf("windows = %+v/%+v, want none when unreported", report.Credits.FiveHour, report.Credits.Weekly)
 	}
 }
+
+func TestBuildQuotaView(t *testing.T) {
+	monthly := 70.0
+	report := QuotaReport{
+		Account: QuotaAccount{UserName: "AnthonyandNancy"},
+		Plan:    QuotaPlan{PlanID: "individual-goat", Name: "GOAT", Status: "active", MonthlyCredits: &monthly, CurrentPeriodEnd: 1792272000000},
+		Credits: QuotaCredits{
+			MonthlyCredits: 29.36, MonthlyReported: true,
+			FiveHour: &QuotaWindow{Used: 2.18, Cap: 14, ResetAtMS: 1791341541000},
+			Weekly:   &QuotaWindow{Used: 10.07, Cap: 35, ResetAtMS: 1791705406000},
+		},
+		Usage: QuotaUsage{Reported: true, CompletedCount: 14779, FailedCount: 19, SuccessRate: 99.87, TotalCost: 41.3353, TotalCredits: 41.34, TotalTokensIn: 2800000000, TotalTokensOut: 15800000},
+	}
+
+	view := buildQuotaView(report)
+	if view.PlanName != "GOAT" || view.PeriodEnds != 1792272000000 {
+		t.Errorf("view = %+v, want the plan header", view)
+	}
+	if view.Monthly == nil || !view.Monthly.Known {
+		t.Fatalf("monthly = %+v, want a known meter", view.Monthly)
+	}
+	if view.Monthly.Used != 40.64 || view.Monthly.Percent != 58 {
+		t.Errorf("monthly = %+v, want 40.64 used / 58%%", view.Monthly)
+	}
+	if view.Monthly.Remaining != 29.36 || view.Monthly.Exhausted {
+		t.Errorf("monthly = %+v, want 29.36 remaining", view.Monthly)
+	}
+	if len(view.Windows) != 2 || view.Windows[0].Key != "five_hour" || view.Windows[1].Key != "weekly" {
+		t.Fatalf("windows = %+v, want five_hour then weekly", view.Windows)
+	}
+	if view.Windows[0].Percent != 16 || view.Windows[1].Percent != 29 {
+		t.Errorf("window percents = %d/%d, want 16/29", view.Windows[0].Percent, view.Windows[1].Percent)
+	}
+	if view.Usage == nil || view.Usage.Requests != 14779 || view.Usage.Failed != 19 {
+		t.Errorf("usage = %+v, want the summary totals", view.Usage)
+	}
+}
+
+func TestBuildQuotaViewUnknownPlanKeepsRemainingOnly(t *testing.T) {
+	report := QuotaReport{
+		Plan:    QuotaPlan{PlanID: "individual-mystery", Name: "individual-mystery"},
+		Credits: QuotaCredits{MonthlyCredits: 5, MonthlyReported: true},
+	}
+	view := buildQuotaView(report)
+	if view.Monthly == nil {
+		t.Fatal("monthly = nil, want the reported balance kept")
+	}
+	if view.Monthly.Known || view.Monthly.LimitReported {
+		t.Errorf("monthly = %+v, want no ratio without a plan total", view.Monthly)
+	}
+	if !view.Monthly.RemainingReported || view.Monthly.Remaining != 5 {
+		t.Errorf("monthly = %+v, want the reported remaining", view.Monthly)
+	}
+}
+
+func TestBuildQuotaViewNoCreditsNoMonthly(t *testing.T) {
+	report := QuotaReport{Plan: QuotaPlan{PlanID: "individual-goat", Name: "GOAT"}}
+	view := buildQuotaView(report)
+	if view.Monthly != nil {
+		t.Errorf("monthly = %+v, want nil when the billing endpoint reported nothing", view.Monthly)
+	}
+}

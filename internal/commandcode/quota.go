@@ -436,3 +436,122 @@ func resetQuotaCache() {
 	quotaCache = map[string]quotaCacheEntry{}
 	quotaCacheMu.Unlock()
 }
+
+// quotaView is the JSON the account page renders. Derived figures (used,
+// percentages) are computed here so the page stays a formatter; the *_reported
+// flags keep a missing figure from being drawn as a confident zero.
+type quotaView struct {
+	Account    string            `json:"account,omitempty"`
+	PlanName   string            `json:"plan_name,omitempty"`
+	PlanStatus string            `json:"plan_status,omitempty"`
+	PeriodEnds int64             `json:"period_ends,omitempty"`
+	Monthly    *quotaMonthlyView `json:"monthly,omitempty"`
+	Windows    []quotaWindowView `json:"windows,omitempty"`
+	Usage      *quotaUsageView   `json:"usage,omitempty"`
+	Failures   []string          `json:"failures,omitempty"`
+}
+
+type quotaMonthlyView struct {
+	LimitReported     bool    `json:"limit_reported"`
+	Limit             float64 `json:"limit"`
+	RemainingReported bool    `json:"remaining_reported"`
+	Remaining         float64 `json:"remaining"`
+	PurchasedReported bool    `json:"purchased_reported"`
+	Purchased         float64 `json:"purchased"`
+	FreeReported      bool    `json:"free_reported"`
+	Free              float64 `json:"free"`
+	Known             bool    `json:"known"`
+	Used              float64 `json:"used"`
+	Percent           int     `json:"percent"`
+	Exhausted         bool    `json:"exhausted"`
+}
+
+type quotaWindowView struct {
+	Key      string  `json:"key"`
+	Used     float64 `json:"used"`
+	Cap      float64 `json:"cap"`
+	Percent  int     `json:"percent"`
+	Exceeded bool    `json:"exceeded"`
+	ResetAt  int64   `json:"reset_at,omitempty"`
+}
+
+type quotaUsageView struct {
+	Requests    float64 `json:"requests"`
+	Failed      float64 `json:"failed"`
+	SuccessRate float64 `json:"success_rate"`
+	Cost        float64 `json:"cost"`
+	Credits     float64 `json:"credits"`
+	TokensIn    float64 `json:"tokens_in"`
+	TokensOut   float64 `json:"tokens_out"`
+}
+
+// buildQuotaView renders one report for the account page.
+func buildQuotaView(report QuotaReport) quotaView {
+	view := quotaView{
+		Account:    firstNonEmpty(report.Account.UserName, report.Account.Name),
+		PlanName:   report.Plan.Name,
+		PlanStatus: report.Plan.Status,
+		PeriodEnds: report.Plan.CurrentPeriodEnd,
+		Failures:   report.Failures,
+	}
+	view.Monthly = buildQuotaMonthlyView(report)
+	if report.Credits.FiveHour != nil {
+		view.Windows = append(view.Windows, buildQuotaWindowView("five_hour", report.Credits.FiveHour))
+	}
+	if report.Credits.Weekly != nil {
+		view.Windows = append(view.Windows, buildQuotaWindowView("weekly", report.Credits.Weekly))
+	}
+	if report.Usage.Reported {
+		view.Usage = &quotaUsageView{
+			Requests:    report.Usage.CompletedCount,
+			Failed:      report.Usage.FailedCount,
+			SuccessRate: report.Usage.SuccessRate,
+			Cost:        report.Usage.TotalCost,
+			Credits:     report.Usage.TotalCredits,
+			TokensIn:    report.Usage.TotalTokensIn,
+			TokensOut:   report.Usage.TotalTokensOut,
+		}
+	}
+	return view
+}
+
+// buildQuotaMonthlyView derives the monthly meter: the limit is the PLAN's
+// credit total, the reported monthlyCredits is the remaining balance. A missing
+// balance stays a missing figure (Known=false), never "100% used".
+func buildQuotaMonthlyView(report QuotaReport) *quotaMonthlyView {
+	monthly := report.Credits
+	plan := report.Plan
+	view := &quotaMonthlyView{
+		Purchased:         monthly.PurchasedCredits,
+		PurchasedReported: monthly.PurchasedReported,
+		Free:              monthly.FreeCredits,
+		FreeReported:      monthly.FreeReported,
+		RemainingReported: monthly.MonthlyReported,
+		Remaining:         math.Max(0, monthly.MonthlyCredits),
+	}
+	if plan.MonthlyCredits != nil {
+		view.LimitReported = true
+		view.Limit = *plan.MonthlyCredits
+	}
+	if !view.LimitReported && !view.RemainingReported && !view.PurchasedReported && !view.FreeReported {
+		return nil
+	}
+	if view.LimitReported && view.RemainingReported && view.Limit > 0 {
+		view.Known = true
+		view.Used = math.Max(0, view.Limit-view.Remaining)
+		view.Percent = quotaPercent(view.Used, view.Limit)
+		view.Exhausted = view.Remaining <= 0
+	}
+	return view
+}
+
+func buildQuotaWindowView(key string, window *QuotaWindow) quotaWindowView {
+	return quotaWindowView{
+		Key:      key,
+		Used:     window.Used,
+		Cap:      window.Cap,
+		Percent:  quotaPercent(window.Used, window.Cap),
+		Exceeded: window.Exceeded,
+		ResetAt:  window.ResetAtMS,
+	}
+}
