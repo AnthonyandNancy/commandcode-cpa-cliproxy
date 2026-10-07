@@ -299,3 +299,42 @@ func TestBuildQuotaViewNoCreditsNoMonthly(t *testing.T) {
 		t.Errorf("monthly = %+v, want nil when the billing endpoint reported nothing", view.Monthly)
 	}
 }
+
+func TestQuotaFetchResponseForMapsWindowsAndMetrics(t *testing.T) {
+	monthly := 70.0
+	report := QuotaReport{
+		Plan: QuotaPlan{PlanID: "individual-goat", Name: "GOAT", MonthlyCredits: &monthly, CurrentPeriodEnd: 1792425600000},
+		Credits: QuotaCredits{MonthlyCredits: 29.36, MonthlyReported: true, PurchasedReported: true, FreeReported: true,
+			FiveHour: &QuotaWindow{Used: 2.18, Cap: 14, ResetAtMS: 1791341541000},
+			Weekly:   &QuotaWindow{Used: 10.07, Cap: 35, ResetAtMS: 1791705406000}},
+		Usage: QuotaUsage{Reported: true, CompletedCount: 14779, FailedCount: 19, SuccessRate: 99.87, TotalCost: 41.3353, TotalCredits: 41.34},
+	}
+	resp := QuotaFetchResponseFor(report)
+	if resp.Subscription == nil || resp.Subscription.TierID != "individual-goat" || resp.Subscription.Plan != "GOAT" {
+		t.Fatalf("subscription = %+v, want the GOAT plan", resp.Subscription)
+	}
+	if len(resp.Groups) != 1 || len(resp.Groups[0].Buckets) != 3 {
+		t.Fatalf("groups = %+v, want monthly/5h/weekly buckets", resp.Groups)
+	}
+	if got := resp.Groups[0].Buckets[0]; got.Window != "monthly" || got.ResetTime != "2026-10-19T16:00:00Z" {
+		t.Errorf("monthly bucket = %+v", got)
+	}
+	five := resp.Groups[0].Buckets[1]
+	if five.Window != "5h" || five.RemainingFraction < 0.84 || five.RemainingFraction > 0.85 {
+		t.Errorf("5h bucket = %+v, want ~0.844 remaining", five)
+	}
+	if resp.Groups[0].Buckets[2].Window != "weekly" {
+		t.Errorf("weekly bucket = %+v", resp.Groups[0].Buckets[2])
+	}
+	if len(resp.Summary) == 0 {
+		t.Fatal("summary is empty, want metrics")
+	}
+}
+
+func TestQuotaFetchResponseForUncappedWindowHasZeroFraction(t *testing.T) {
+	report := QuotaReport{Credits: QuotaCredits{FiveHour: &QuotaWindow{Used: 3, Cap: 0}}}
+	resp := QuotaFetchResponseFor(report)
+	if len(resp.Groups) != 1 || resp.Groups[0].Buckets[0].RemainingFraction != 0 {
+		t.Fatalf("buckets = %+v, want an uncapped bucket with zero ratio", resp.Groups)
+	}
+}
