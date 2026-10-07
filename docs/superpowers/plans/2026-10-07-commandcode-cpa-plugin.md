@@ -416,10 +416,14 @@
 | 样式与 CPAMP 一致 + 双语 | Task 8 | Task 8 |
 | 插件形式交付、不改源码 | Task 1 / 9 | Task 1 / 9 |
 | 上游协议与 commandcode-proxy 一致 | Task 4 / 6 / 7 | Task 4 / 6 / 7 / 10 |
+| 账号页展示月额度 / 5H 窗口 / 每周窗口与用量 | 新计划 Step 3 / 6 / 7 | Step 3 / 6 / 7 |
+| CPAMP 凭证管理显示 CommandCode 额度（Codex 同机制） | 新计划 Step 4 / 5 | Step 4 / 5 + 部署冒烟 |
 
 ## 附录 B：明确不做（回归时不要"顺手"实现）
 
-额度/健康能力、官方 CLI 登录流程、模型→账号路由、跨凭据轮换、会话内容存储、其他 provider 改造、CPA/CPAMP 源码修改。
+官方 CLI 登录流程、模型→账号路由、跨凭据轮换、会话内容存储、其他 provider 改造、CPA/CPAMP 源码修改。
+
+> 2026-10-07 变更：额度能力已从"不做"移出，按新需求实现，见 `docs/superpowers/plans/2026-10-07-commandcode-quota-implementation-plan.md`。
 
 ---
 
@@ -437,6 +441,7 @@
 | 8 | DONE | 503f73c | 账号页（双语/CPAMP 变量）、save/toggle/remove/restore/purge |
 | 9 | DONE | (随 Task 10) | 配置测试、README、DEPLOY、store registry、Makefile |
 | 10 | DONE | (随 Task 10) | 验收测试 + 全量验证（gofmt / vet / tests / c-shared 构建 / ABI 符号核对） |
+| 额度 | DONE | 见新计划 | 月额度/5H/每周窗口 + 用量：账号页 `?action=quota` 与 CPAMP quota provider（`docs/superpowers/plans/2026-10-07-commandcode-quota-implementation-plan.md`） |
 
 ### 执行期偏差（Deviation）
 

@@ -2012,53 +2012,54 @@ cd dist && sha256sum commandcode.* > checksums.txt
 
 | File | Action | Reason |
 | ---- | ------ | ------ |
-| `internal/commandcode/quota.go` | Add | 额度端点常量之外的取数/解析/缓存/页面视图 |
-| `internal/commandcode/quota_provider.go` | Add | quota.* RPC handlers 与 CPAMP 归一化映射 |
-| `internal/commandcode/quota_test.go` | Add | 额度单测（假上游、解析、缓存、映射、handlers） |
-| `internal/commandcode/provider.go` | Modify | 新增 4 个 `/alpha` 端点常量；版本号提升 |
-| `internal/commandcode/rpc.go` | Modify | 注册 `quota_provider` 能力并分发 quota.* 方法 |
-| `internal/commandcode/management.go` | Modify | 新增只读 `?action=quota` |
-| `internal/commandcode/page.go` | Modify | 额度按钮/弹层/样式/中英文案 |
+| `internal/commandcode/quota.go` | Add | `/alpha` 额度取数（whoami → 并行三端点）、解析、60s 缓存、页面视图 `buildQuotaView` 与派生值 |
+| `internal/commandcode/quota_provider.go` | Add | `quota.identifier/describe/fetch/reset` handlers 与 `QuotaFetchResponseFor` 宿主归一化映射 |
+| `internal/commandcode/quota_test.go` | Add | 假上游四端点、解析/部分失败/全失败/缓存/未知套餐、视图、映射、handlers 单测 |
+| `internal/commandcode/provider.go` | Modify | 新增 `EndpointWhoami/UsageSummary/BillingCredits/BillingSubscriptions`；`Version` 0.1.2 → 0.2.0 |
+| `internal/commandcode/rpc.go` | Modify | `capabilities.QuotaProvider` 注册为 true；分发 4 个 `quota.*` 方法 |
+| `internal/commandcode/management.go` | Modify | 新增只读 `?action=quota`（`loadAccountByFile` → `FetchQuotaReport` → `buildQuotaView`） |
+| `internal/commandcode/page.go` | Modify | 账号行「额度」按钮、额度弹层、进度条/卡片样式、23 个中英文案键 |
 | `internal/commandcode/rpc_test.go` | Modify | 断言注册能力含 `quota_provider` |
-| `internal/commandcode/management_test.go` | Modify | `action=quota` 与页面额度面板测试 |
-| `README.md` | Modify | 账号页操作/职责边界补充额度 |
-| `docs/superpowers/plans/2026-10-07-commandcode-cpa-plugin.md` | Modify | 附录 B 与追溯矩阵修订（需求与文档一致） |
-| `store/registry-entry.json` | Modify | v0.2.0 版本与产物校验值 |
-| `dist/commandcode.dll` 等 | Modify | 重建发布产物（Windows） |
+| `internal/commandcode/management_test.go` | Modify | `?action=quota`（含只读模式、未知文件）与页面额度面板测试 |
+| `README.md` | Modify | 账号页操作表、职责边界表、能力清单补充额度说明 |
+| `docs/superpowers/plans/2026-10-07-commandcode-cpa-plugin.md` | Modify | 附录 B 移出“额度不做”、追溯矩阵与执行记录补额度行 |
+| `store/registry-entry.json` | Modify | version 0.2.0、windows 产物 url/sha256/size、描述与 tags |
+| `dist/commandcode.dll`、`dist/commandcode-v0.2.0.dll`、`dist/commandcode-v0.2.0-windows-amd64.zip`、`dist/commandcode-v0.2.0.dll.sha256` | Add | 重建的 v0.2.0 Windows 发布产物（`dist/` 被 `.gitignore` 忽略，不入库） |
+| `backups/2026-10-07-quota/` | Add | 执行前对将被修改文件的备份（`*.go.bak` + README/registry 原件；不入库） |
 
-> 执行过程中每修改一个文件，必须回到本表更新（新增/删除行、补 Reason）。
+> 上表为本次 Coding 的**实际**结果（含未入库的构建产物与备份）。
 
 ---
 
 ## 5. Verification Checklist
 
 **主流程验证**
-- [ ] `go test ./internal/commandcode/ -run TestFetchQuotaReport -v` 全绿（四端点解析、部分失败、全失败、缓存、未知套餐）
-- [ ] `go test ./internal/commandcode/ -run 'TestBuildQuotaView|TestQuotaFetchResponseFor' -v` 全绿（页面视图与 CPAMP 映射）
-- [ ] `go test ./internal/commandcode/ -run 'TestAccountsQuotaAction|TestAccountsPageHasQuotaPanel' -v` 全绿（页面动作与页面结构）
-- [ ] 本地假上游 + 假 host 手工核对：`?action=quota&file=commandcode-abc.json` 返回月额度 40.64/70（58%）、5H 2.18/14（16%）、每周 10.07/35（29%）、请求 14779 + 19 失败
+- [x] `go test ./internal/commandcode/ -run TestFetchQuotaReport -v` 全绿（四端点解析、部分失败、全失败、缓存、未知套餐）
+- [x] `go test ./internal/commandcode/ -run 'TestBuildQuotaView|TestQuotaFetchResponseFor' -v` 全绿（页面视图与 CPAMP 映射）
+- [x] `go test ./internal/commandcode/ -run 'TestAccountsQuotaAction|TestAccountsPageHasQuotaPanel' -v` 全绿（页面动作与页面结构）
+- [x] 本地假上游 + 假 host 核对：`?action=quota&file=commandcode-abc.json` 返回月额度 40.64/70（58%）、5H 2.18/14（16%）、每周 10.07/35（29%）、请求 14779 + 19 失败
 
 **关联流程验证**
-- [ ] `Registration()` 含 `"quota_provider":true`（`TestRegistrationCapabilities`）
-- [ ] `HandleMethod("quota.identifier"| "quota.describe" | "quota.fetch" | "quota.reset")` 均返回宿主可解析帧（`TestHandleMethodDispatchesQuota` 等）
-- [ ] 部署环境（非本地）：`GET /v0/management/quota/providers` 出现 commandcode；`POST /v0/management/quota/fetch` 返回归一化额度；auth-files 里该凭据 `supports_quota=true`；CPAMP 凭证管理可打开额度
+- [x] `Registration()` 含 `"quota_provider":true`（`TestRegistrationCapabilities`）
+- [x] `HandleMethod("quota.identifier" | "quota.describe" | "quota.fetch" | "quota.reset")` 均返回宿主可解析帧
+- [ ] 部署环境（非本地，本环境无 CPAMP/真实上游）：`GET /v0/management/quota/providers` 出现 commandcode；`POST /v0/management/quota/fetch` 返回归一化额度；auth-files 里该凭据 `supports_quota=true`；CPAMP 凭证管理可打开额度
 
 **边界情况验证**
-- [ ] 无效 key（401）→ 四端点全失败 → 明确错误、不缓存、不显示假数据
-- [ ] 单端点 500 → 其余数据照常返回，`failures` 显示该端点
-- [ ] 未知 planId → 只显示剩余，无比例条
-- [ ] `cap=0`（无上限窗口）→ 不画比例（Percent=0 / RemainingFraction=0）
-- [ ] `exceeded=true` → 条变红并显示“已用尽”；`resetAt=0` → 不显示重置时间
-- [ ] `monthlyCredits` 缺失（`monthly_reported=false`）→ 显示 `—`，不显示 100% 已用
-- [ ] `allow-page-write=false` → `action=quota` 仍可用；写动作仍被拒
-- [ ] API key 不出现在 URL、页面源码、日志字段中
+- [x] 无效 key（401）→ 四端点全失败 → 明确错误、不缓存、不显示假数据
+- [x] 单端点 500 → 其余数据照常返回，`failures` 显示该端点
+- [x] 未知 planId → 只显示剩余，无比例条
+- [x] `cap=0`（无上限窗口）→ 不画比例（Percent=0 / RemainingFraction=0）
+- [x] `exceeded=true` / `resetAt=0` 的渲染分支在页面实现（`meter.bad` / 空重置时间）
+- [x] `monthlyCredits` 缺失（`monthly_reported=false`）→ 显示 `—`，不显示 100% 已用
+- [x] `allow-page-write=false` → `action=quota` 仍可用（`TestAccountsQuotaAction` 以只读配置执行）
+- [x] API key 不出现在 URL、页面源码、日志字段中（沿用现有约定，未新增日志）
 
 **Test / Build / Lint / Typecheck**
-- [ ] `gofmt -l .`：无输出
-- [ ] `go vet ./...`：通过
-- [ ] `go test ./internal/...`：全绿
-- [ ] `go build -buildmode=c-shared -o dist/commandcode.dll .`（`make build-windows`）：通过
-- [ ] （可选）`nm -g dist/commandcode.dll | grep cliproxy`：四个 ABI 符号仍在
+- [x] `gofmt -l`：无输出
+- [x] `go vet ./...`：通过
+- [x] `go test ./internal/... -count=1`：全绿
+- [x] `go build -buildmode=c-shared -ldflags "-X commandcode-cliproxy-plugin/internal/commandcode.Version=0.2.0" -o dist/commandcode.dll .`：通过
+- [x] `nm -g dist/commandcode.dll | grep cliproxy`：四个 ABI 符号存在；`strings` 确认版本戳 0.2.0
 
 ---
 
@@ -2068,7 +2069,9 @@ cd dist && sha256sum commandcode.* > checksums.txt
 
 | 日期 | 原计划 | 新发现 | 调整内容 | 确认 |
 | ---- | ------ | ------ | -------- | ---- |
-|      |        |        |          |      |
+| 2026-10-07 | Step 4 测试断言 `currentPeriodEnd: 1792272000000` → `2026-10-19T16:00:00Z` | 该字面量实际是 `2026-10-17T21:20:00Z`，计划中的换算写错 | 仅修正测试字面量为 `1792425600000`（= 2026-10-19T16:00:00Z）；实现（ms → RFC3339）不变 | 自证（实现与断言一致后通过） |
+| 2026-10-07 | Step 8 用 `make build-windows` | 本环境 bash 无 `make`；且 Makefile `VERSION ?= 0.1.0` 会把产物盖成 0.1.0 | 直接执行 Makefile 底层命令：`go build -buildmode=c-shared -ldflags "-X ...Version=0.2.0" -o dist/commandcode.dll .` | 自证（产物版本戳 0.2.0、ABI 符号存在） |
+| 2026-10-07 | D1 备份保留 `backups/2026-10-07-quota/*.go` | 备份的 `.go` 文件会被 `go vet ./...` 当成同模块的包（undefined: RuntimeConfig） | 备份文件重命名为 `*.go.bak`（内容不变，仍保留在 `backups/`） | 自证（`go vet ./...` 恢复通过） |
 
 ---
 
@@ -2078,14 +2081,56 @@ cd dist && sha256sum commandcode.* > checksums.txt
 
 ### Step 1 Completed
 
-Modified:
-- （待执行）
+Modified: `internal/commandcode/provider.go`、`internal/commandcode/quota.go`(Add)、`internal/commandcode/quota_test.go`(Add)
+Changes: 4 个 `/alpha` 端点常量；套餐→月额度表 + 最长前缀解析；`recordValue/floatValue/floatValueOr/periodEndMillis/quotaPercent/clampFraction/rfc3339Millis`
+Reason: 固定上游契约与纯函数，便于 TDD
+Verification: `go test -run 'TestSubscriptionPlanInfoLongestPrefix|TestQuotaPercentAndFraction'` PASS
 
-Changes:
-- （待执行）
+### Step 2 Completed
 
-Reason:
-- （待执行）
+Modified: `internal/commandcode/quota.go`、`internal/commandcode/quota_test.go`
+Changes: `QuotaReport` 等类型；`FetchQuotaReport`（whoami → 并行 usage/credits/subscriptions、30s 上限、单端点失败降级、60s 缓存）；解析函数与缓存
+Reason: 四个上游端点取数与容错是页面与 CPAMP 的共同数据源
+Verification: `go test -run TestFetchQuotaReport -v` 5 项 PASS
 
-Verification:
-- （待执行）
+### Step 3 Completed
+
+Modified: `internal/commandcode/quota.go`、`internal/commandcode/quota_test.go`
+Changes: `quotaView/quotaMonthlyView/quotaWindowView/quotaUsageView` 与 `buildQuotaView/buildQuotaMonthlyView/buildQuotaWindowView`
+Reason: 页面只做格式化，派生逻辑可测
+Verification: `go test -run TestBuildQuotaView -v` 3 项 PASS
+
+### Step 4 Completed
+
+Modified: `internal/commandcode/quota_provider.go`(Add)、`internal/commandcode/quota_test.go`
+Changes: `QuotaFetchResponseFor`（Subscription + Summary + monthly/5h/weekly buckets）与 `quotaBucket/quotaCurrencyMetric`
+Reason: 宿主只认归一化 `QuotaFetchResponse`
+Verification: `go test -run TestQuotaFetchResponseFor -v` 2 项 PASS（含计划中时间戳字面量修正）
+
+### Step 5 Completed
+
+Modified: `internal/commandcode/quota_provider.go`、`internal/commandcode/rpc.go`、`internal/commandcode/quota_test.go`、`internal/commandcode/rpc_test.go`
+Changes: 4 个 quota RPC handlers；`capabilities.quota_provider=true` 注册；方法分发
+Reason: CPAMP 通过注册能力发现并路由额度请求；`quota.reset` 必须存在
+Verification: `go test -run 'TestQuota|TestHandleMethodDispatchesQuota|TestRegistrationCapabilities' -v` 8 项 PASS
+
+### Step 6 Completed
+
+Modified: `internal/commandcode/management.go`、`internal/commandcode/management_test.go`
+Changes: 只读 `?action=quota`；未知文件错误分支测试、只读模式测试
+Reason: 需求 1 的页面数据入口
+Verification: `go test -run TestAccountsQuotaAction -v` 2 项 PASS
+
+### Step 7 Completed
+
+Modified: `internal/commandcode/page.go`、`internal/commandcode/management_test.go`
+Changes: 额度按钮 + 弹层 + 进度条/卡片样式 + 中英文案；`renderQuota/openQuota`
+Reason: 需求 1/2 的界面落点
+Verification: `go test -run 'TestAccountsPage|TestAccountsQuotaAction' -v` 5 项 PASS；`node --check`（提取 `pageRuntime`）exit=0
+
+### Step 8 Completed
+
+Modified: `internal/commandcode/provider.go`、`README.md`、`docs/superpowers/plans/2026-10-07-commandcode-cpa-plugin.md`、`store/registry-entry.json`、`dist/`（产物）
+Changes: 版本 0.2.0；文档修订（附录 B/追溯矩阵/README 能力与职责边界）；windows 产物 zip+sha256+size 写入 registry entry
+Reason: 需求文档一致性与发布物
+Verification: `gofmt -l` 无输出；`go vet ./...` 通过；`go test ./internal/... -count=1` 全绿；c-shared 构建成功（版本戳 0.2.0、ABI 符号存在）
