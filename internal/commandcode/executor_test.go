@@ -225,12 +225,8 @@ func TestHandleExecuteRequestScopedErrorStopsRotation(t *testing.T) {
 	if err == nil {
 		t.Fatal("handleExecute() error = nil, want the upstream rejection reported")
 	}
-	status, ok := err.(interface{ StatusCode() int })
-	if !ok {
-		t.Fatalf("error %T does not expose a status code, so CPA cannot classify it", err)
-	}
-	if status.StatusCode() != http.StatusBadRequest {
-		t.Errorf("StatusCode() = %d, want 400 so CPA never rotates credentials", status.StatusCode())
+	if got := statusOf(err); got != http.StatusBadRequest {
+		t.Errorf("StatusCode() = %d, want 400 so CPA never rotates credentials (err=%v)", got, err)
 	}
 	if !strings.Contains(err.Error(), "BAD_REQUEST") {
 		t.Errorf("error = %q, want the upstream code preserved for operators", err.Error())
@@ -266,12 +262,8 @@ func TestHandleExecuteCredentialScopedErrorAllowsRotation(t *testing.T) {
 		if err == nil {
 			t.Fatalf("upstream %d: error = nil", tc.upstream)
 		}
-		status, ok := err.(interface{ StatusCode() int })
-		if !ok {
-			t.Fatalf("upstream %d: error %T has no status code", tc.upstream, err)
-		}
-		if status.StatusCode() != tc.wantStatus {
-			t.Errorf("upstream %d: StatusCode() = %d, want %d", tc.upstream, status.StatusCode(), tc.wantStatus)
+		if got := statusOf(err); got != tc.wantStatus {
+			t.Errorf("upstream %d: StatusCode() = %d, want %d (err=%v)", tc.upstream, got, tc.wantStatus, err)
 		}
 	}
 }
@@ -291,8 +283,8 @@ func TestHandleExecuteZeroOutputIsRetryable(t *testing.T) {
 	if err == nil {
 		t.Fatal("zero-output turn returned success, want a retryable failure")
 	}
-	if status := err.(interface{ StatusCode() int }).StatusCode(); status != http.StatusTooManyRequests {
-		t.Errorf("StatusCode() = %d, want 429 (retryable, credential cooldown)", status)
+	if got := statusOf(err); got != http.StatusTooManyRequests {
+		t.Errorf("StatusCode() = %d, want 429 (retryable, credential cooldown) (err=%v)", got, err)
 	}
 }
 
@@ -468,6 +460,15 @@ func TestSessionIDFromRequestPrefersCanonical(t *testing.T) {
 	if got := sessionIDFromRequest(&pluginapi.ExecutorRequest{}); got != "" {
 		t.Errorf("sessionIDFromRequest() = %q, want empty", got)
 	}
+}
+
+// statusOf reads the optional status a plugin error exposes to CPA.
+func statusOf(err error) int {
+	coder, ok := err.(interface{ StatusCode() int })
+	if !ok || coder == nil {
+		return 0
+	}
+	return coder.StatusCode()
 }
 
 func sleepMillis(ms int) {

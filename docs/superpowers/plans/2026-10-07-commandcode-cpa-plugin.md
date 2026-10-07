@@ -79,7 +79,7 @@
 - [ ] Step 4: 运行同命令，预期 PASS；再跑 `go build ./...`
 - [ ] Step 5: `git init` + 首次提交（无 git 则跳过提交）
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -117,7 +117,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -154,7 +154,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -191,7 +191,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -223,7 +223,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -256,7 +256,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -290,7 +290,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -327,7 +327,7 @@
 - [ ] Step 4: 运行，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -362,7 +362,7 @@
 - [ ] Step 4: 运行测试 + 构建 + vet，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -394,7 +394,7 @@
 - [ ] Step 4: 全量 `go test ./internal/... -v` + `go vet ./...` + 构建，预期 PASS
 - [ ] Step 5: 提交
 
-**Status:** TODO
+**Status:** DONE (2026-10-07)
 **Deviation:** —
 
 ---
@@ -420,3 +420,34 @@
 ## 附录 B：明确不做（回归时不要"顺手"实现）
 
 额度/健康能力、官方 CLI 登录流程、模型→账号路由、跨凭据轮换、会话内容存储、其他 provider 改造、CPA/CPAMP 源码修改。
+
+---
+
+## 执行记录（Execution Log）
+
+| Task | Status | 提交 | 说明 |
+|---|---|---|---|
+| 1 | DONE | 3dd1da0 | 骨架 + cgo ABI + 注册 payload；`RuntimeConfig`/`ConfigFields` 提前落地（Task 3-8 都消费它） |
+| 2 | DONE | 426ce85 | 凭据模型、确定性文件名、read-modify-write、auth.parse |
+| 3 | DONE | db45342 | 设备身份派生、指纹/lifecycle 预请求、节流与单飞 |
+| 4 | DONE | bcff592 | 信封移植（键序、threadId 规则、system 块、tools、tool_choice、图片提升与预算） |
+| 5 | DONE | bcff592 | 模型目录：静态兜底 + 按凭据拉取 + TTL 缓存 |
+| 6 | DONE | bcff592 | 上游调用、状态码映射、请求级/凭据级错误分级 |
+| 7 | DONE | be75b77 | 流转译、execute/execute_stream、零输出与空闲超时 |
+| 8 | DONE | 503f73c | 账号页（双语/CPAMP 变量）、save/toggle/remove/restore/purge |
+| 9 | DONE | (随 Task 10) | 配置测试、README、DEPLOY、store registry、Makefile |
+| 10 | DONE | (随 Task 10) | 验收测试 + 全量验证（gofmt / vet / tests / c-shared 构建 / ABI 符号核对） |
+
+### 执行期偏差（Deviation）
+
+1. **Task 9 部分前置到 Task 1**：`config.go` 的 `RuntimeConfig`、默认值、`ApplyConfigYAML`、`ConfigFields()` 在 Task 1 实现，因为 Task 3-8 都要读配置；Task 9 只保留配置测试与文档/分发物。
+2. **Task 5 与 Task 6 合并执行**：两者共享同一次构建/测试循环，无功能偏差。
+3. **Task 6 对上游 404 的处理是有意偏差**：commandcode-proxy 把 404 映射为下游 404；本插件把「发给 CPA 的错误状态」压到 400（客户端文案仍保留 404 语义），因为 Requirement 明确要求 400/404/422 属于请求级错误、禁止跨账号放大，而 CPA 只按状态码判定请求级（404 会被判为凭据级 → 触发换号与冷却）。已在代码注释与 Plan 中记录。
+4. **Task 7 由测试发现并修复两个实现缺陷**（非计划变更）：异步流把请求上下文与上游 body 的所有权收进 goroutine（否则 RPC 返回即取消/关闭，流被截断）；工具结果图片提升进 user 消息后必须复用 user 图片转换（否则仍是 `image_url` 形态、丢失 `mimeType` 与 `_toolImage` 标记）。
+5. **额外健壮性（小范围，已记录）**：页面以凭据文件为 label/priority/note 的真源（宿主条目仅作回退）；插件记住上一次发现的 auth 目录，使「移出后仍可恢复/彻底删除」。
+
+### 未在本环境验证（需在上线环境复核）
+
+- **Linux / macOS 构建**：本机只有 Windows 目标 C 编译器（MinGW），无法产出 Linux/macOS 动态库；命令已写入 `Makefile` 与 `docs/DEPLOY.md`。
+- **真实上游联调**：本环境无法访问 `commandcode.ai`（域名解析到非公网地址），也没有 `user_*` 凭据；上游协议按 commandcode-proxy 的既有实现移植并由假上游测试覆盖，真实账号冒烟步骤见 `docs/DEPLOY.md` §5。
+- **真实 CPA 加载**：本环境没有运行中的 CPA 实例；ABI 导出符号（`cliproxy_plugin_init` / `cliproxyPluginCall` / `cliproxyPluginFree` / `cliproxyPluginShutdown`）已用 `nm` 核对存在。
