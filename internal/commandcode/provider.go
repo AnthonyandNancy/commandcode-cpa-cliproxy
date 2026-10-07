@@ -24,7 +24,7 @@ import "time"
 // Version is the plugin release version. It can be overridden at build time:
 //
 //	go build -ldflags "-X commandcode-cliproxy-plugin/internal/commandcode.Version=1.2.3"
-var Version = "0.1.1"
+var Version = "0.1.2"
 
 // RepositoryURL is advertised to the management panel. Replace it with the real
 // repository before publishing, or override it at build time with -ldflags.

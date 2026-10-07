@@ -456,6 +456,14 @@ func TestAccountsPageUsesOwnRouteAndModal(t *testing.T) {
 	if !strings.Contains(page, "function openModal") {
 		t.Error("the modal open handler is missing")
 	}
+	// The dialog is hidden with the [hidden] attribute while .overlay declares
+	// display:flex, so the guard rule is what makes closing it possible at all.
+	if !strings.Contains(page, "[hidden] { display: none !important; }") {
+		t.Error("the page is missing the [hidden] guard: a display rule would keep the dialog open forever")
+	}
+	if !strings.Contains(page, "function closeModal") || !strings.Contains(page, "overlay.hidden = true") {
+		t.Error("the modal close path is missing")
+	}
 	if strings.Contains(page, "id=\"save\"") {
 		t.Error("the old inline add form is still present")
 	}

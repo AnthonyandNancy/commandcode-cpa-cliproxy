@@ -200,6 +200,10 @@ func AccountsPageHTML(lang string) string {
 const pageStyle = `
 :root { color-scheme: light dark; }
 * { box-sizing: border-box; }
+/* The [hidden] attribute must win over any author-level display rule: without
+   this guard an element like .overlay (display:flex) stays visible forever and
+   the dialog can never be closed. */
+[hidden] { display: none !important; }
 body {
   margin: 0; padding: 20px 22px 40px;
   background: var(--app-bg, #eff2f7);

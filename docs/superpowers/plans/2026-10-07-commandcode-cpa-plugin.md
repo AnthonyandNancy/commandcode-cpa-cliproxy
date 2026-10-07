@@ -460,3 +460,5 @@
 | 新增账号表单占据页面顶部、影响展示 | 表单是内联卡片 | 改为**弹窗**：标题栏「新增账号」按钮打开模态框（遮罩点击/Esc 关闭），编辑复用同一弹窗（key 留空=不改） |
 
 回归防护：新增 `TestAccountsPageUsesOwnRouteAndModal`（断言页面派生自身路径、使用 `?action=`、不含硬编码子路径、含弹窗元素、旧内联表单已移除）。
+
+| 弹窗关不掉、一直显示 | `.overlay` 声明了 `display: flex`，覆盖了 `hidden` 属性对应的 `display: none`（作者样式优先于 UA 样式），所以弹窗恒可见、点取消只改了属性没有视觉效果 | 页面样式加入全局守卫 `[hidden] { display: none !important; }`；回归测试断言该守卫与关闭路径存在 |
