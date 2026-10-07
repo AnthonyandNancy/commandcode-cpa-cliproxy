@@ -46,6 +46,29 @@ var accountPageCopy = map[string]map[string]string{
 		"remove_confirm":   "移出后该账号不再参与请求，可用「恢复」找回。确认继续？",
 		"panel_hint":       "删除/排序等操作也可以直接在 CPAMP 凭证管理里完成。",
 		"security":         "安全提示：该页面不经过管理密钥认证，只应在本机或受信网络访问；API Key 不会写入 URL 与日志。",
+		"quota":            "额度",
+		"quota_title":      "额度与用量",
+		"close":            "关闭",
+		"plan":             "套餐",
+		"period_ends":      "账期截止",
+		"monthly":          "月额度",
+		"window_5h":        "5 小时窗口",
+		"window_weekly":    "每周窗口",
+		"reset_at":         "重置于",
+		"quota_limit":      "月额度上限",
+		"quota_used":       "本月已用",
+		"quota_remaining":  "剩余",
+		"quota_purchased":  "已购",
+		"quota_free":       "赠送",
+		"quota_empty":      "上游未返回额度数据。",
+		"exhausted":        "已用尽",
+		"usage_requests":   "请求",
+		"usage_failed":     "失败",
+		"usage_success":    "成功率",
+		"usage_spend":      "花费",
+		"usage_tokens":     "Token",
+		"tokens_in":        "入",
+		"tokens_out":       "出",
 		"saved":            "已保存",
 		"failed":           "操作失败",
 	},
@@ -86,6 +109,29 @@ var accountPageCopy = map[string]map[string]string{
 		"remove_confirm":   "The account stops serving requests after removal. Continue?",
 		"panel_hint":       "Delete and ordering are also available in CPAMP credential management.",
 		"security":         "Security: this page is not authenticated by the management key; keep it on localhost or a trusted network. API keys never enter URLs or logs.",
+		"quota":            "Quota",
+		"quota_title":      "Quota & usage",
+		"close":            "Close",
+		"plan":             "Plan",
+		"period_ends":      "Period ends",
+		"monthly":          "Monthly",
+		"window_5h":        "5-hour window",
+		"window_weekly":    "Weekly window",
+		"reset_at":         "Resets at",
+		"quota_limit":      "Monthly limit",
+		"quota_used":       "Monthly used",
+		"quota_remaining":  "Remaining",
+		"quota_purchased":  "Purchased",
+		"quota_free":       "Free",
+		"quota_empty":      "Upstream returned no quota data.",
+		"exhausted":        "Exhausted",
+		"usage_requests":   "Requests",
+		"usage_failed":     "failed",
+		"usage_success":    "Success rate",
+		"usage_spend":      "Spend",
+		"usage_tokens":     "Tokens",
+		"tokens_in":        "in",
+		"tokens_out":       "out",
 		"saved":            "Saved",
 		"failed":           "The action failed",
 	},
@@ -188,6 +234,14 @@ func AccountsPageHTML(lang string) string {
 	b.WriteString(t("save"))
 	b.WriteString("</button>\n    </div>\n  </div>\n</div>\n")
 
+	b.WriteString("<div class=\"overlay\" id=\"quotaOverlay\" hidden>\n  <div class=\"modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"quotaTitle\">\n")
+	b.WriteString("    <div class=\"modal-head\"><h2 id=\"quotaTitle\">")
+	b.WriteString(t("quota_title"))
+	b.WriteString("</h2></div>\n    <div class=\"modal-body\" id=\"quotaBody\"></div>\n")
+	b.WriteString("    <div class=\"modal-foot\"><button class=\"btn ghost\" id=\"quotaClose\">")
+	b.WriteString(t("close"))
+	b.WriteString("</button></div>\n  </div>\n</div>\n")
+
 	b.WriteString("<div id=\"toast\" class=\"toast\" hidden></div>\n")
 	b.WriteString("<script>\nwindow.__CC = ")
 	b.WriteString(pageScriptLiteral(lang))
@@ -283,6 +337,25 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--primary-color, #409eff
   border: 1px solid var(--app-border, rgba(15,23,42,.14)); border-radius: 10px;
   padding: 10px 16px; box-shadow: 0 6px 24px rgba(15,23,42,.12); max-width: 80vw;
 }
+.meter-row { margin: 0 0 12px; }
+.meter-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin-bottom: 4px; }
+.meter-label { color: var(--app-text-regular, #5f6c7b); }
+.meter {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: var(--app-border, rgba(15,23,42,.08));
+}
+.meter > span { display: block; height: 100%; width: 0; background: var(--primary-color, #409eff); }
+.meter.bad > span { background: var(--danger-color, #f56c6c); }
+.quota-head { margin-bottom: 12px; }
+.quota-head-line { font-weight: 600; }
+.quota-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.tile {
+  border: 1px solid var(--app-border, rgba(15,23,42,.08));
+  border-radius: 10px; padding: 10px;
+  background: var(--bg-secondary, var(--app-surface-muted, #f6faff));
+}
+.tile-label { margin-bottom: 2px; }
+.tile-value { font-weight: 600; font-size: 16px; word-break: break-all; }
 `
 
 // pageScriptLiteral renders the localized strings embedded into the page. Every
@@ -299,6 +372,10 @@ func pageScriptLiteral(lang string) string {
 		"empty", "status", "cooldown", "enable", "disable", "edit", "remove", "restore",
 		"purge", "removed", "remove_confirm", "purge_confirm", "save", "saved", "failed",
 		"add_title", "edit_title", "loading", "write_disabled",
+		"quota", "quota_title", "close", "plan", "period_ends", "monthly", "window_5h",
+		"window_weekly", "reset_at", "quota_limit", "quota_used", "quota_remaining",
+		"quota_purchased", "quota_free", "quota_empty", "exhausted", "usage_requests",
+		"usage_failed", "usage_success", "usage_spend", "usage_tokens", "tokens_in", "tokens_out",
 	}
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -324,6 +401,9 @@ const pageRuntime = `
   var baseUrlInput = document.getElementById('baseUrl');
   var writeEnabled = true;
   var editingFile = '';
+  var quotaOverlay = document.getElementById('quotaOverlay');
+  var quotaTitle = document.getElementById('quotaTitle');
+  var quotaBody = document.getElementById('quotaBody');
 
   function toast(text) {
     if (!text) return;
@@ -352,6 +432,131 @@ const pageRuntime = `
       });
     }, function (err) {
       return { ok: false, error: String((err && err.message) || err) };
+    });
+  }
+
+  function money(value) { return '$' + Number(value || 0).toFixed(2); }
+  function moneyExact(value) { return '$' + Number(value || 0).toFixed(4); }
+  function tokens(value) {
+    value = Number(value || 0);
+    if (value >= 1e9) return (value / 1e9).toFixed(1) + 'B';
+    if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+    if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+    return String(value);
+  }
+  function localDateTime(ms) { return ms > 0 ? new Date(ms).toLocaleString() : ''; }
+  function localDate(ms) { return ms > 0 ? new Date(ms).toLocaleDateString() : ''; }
+
+  function element(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = text;
+    return node;
+  }
+
+  // A percentage bar: the printed figure keeps its real overshoot, the bar
+  // width is clamped into [0, 100].
+  function meterRow(label, valueText, percentText, percentValue, note, exceeded) {
+    var row = element('div', 'meter-row');
+    var head = element('div', 'meter-head');
+    head.appendChild(element('span', 'meter-label', label));
+    head.appendChild(element('span', 'muted small', valueText + (percentText ? '  ' + percentText : '')));
+    row.appendChild(head);
+    var track = element('div', 'meter' + (exceeded ? ' bad' : ''));
+    var fill = element('span');
+    fill.style.width = Math.min(100, Math.max(0, Number(percentValue) || 0)) + '%';
+    track.appendChild(fill);
+    row.appendChild(track);
+    if (note) row.appendChild(element('div', 'muted small', note));
+    return row;
+  }
+
+  function tile(label, value, sub) {
+    var box = element('div', 'tile');
+    box.appendChild(element('div', 'tile-label muted small', label));
+    box.appendChild(element('div', 'tile-value', value));
+    if (sub) box.appendChild(element('div', 'muted small', sub));
+    return box;
+  }
+
+  function renderQuota(view) {
+    quotaBody.innerHTML = '';
+    var bits = [];
+    if (view.plan_name) bits.push(view.plan_name);
+    if (view.plan_status) bits.push(view.plan_status);
+    if (view.account) bits.push(view.account);
+    if (view.period_ends) bits.push((S.period_ends || '') + ' ' + localDate(view.period_ends));
+    var head = element('div', 'quota-head');
+    head.appendChild(element('div', 'quota-head-line', bits.join(' · ')));
+    quotaBody.appendChild(head);
+
+    var monthly = view.monthly;
+    if (monthly && monthly.limit_reported && monthly.known) {
+      quotaBody.appendChild(meterRow(
+        S.monthly,
+        money(monthly.used) + ' / ' + money(monthly.limit),
+        monthly.percent + '%',
+        monthly.percent,
+        monthly.exhausted ? (S.exhausted || '') : '',
+        monthly.exhausted
+      ));
+    } else if (monthly && monthly.remaining_reported) {
+      quotaBody.appendChild(meterRow(S.monthly, money(monthly.remaining), '', 0, '', false));
+    }
+    (view.windows || []).forEach(function (window) {
+      var label = window.key === 'five_hour' ? S.window_5h : S.window_weekly;
+      var note = window.reset_at ? ((S.reset_at || '') + ' ' + localDateTime(window.reset_at)) : '';
+      quotaBody.appendChild(meterRow(
+        label,
+        money(window.used) + ' / ' + money(window.cap),
+        window.percent + '%',
+        window.percent,
+        note,
+        window.exceeded
+      ));
+    });
+
+    if (monthly) {
+      var quotaTiles = element('div', 'quota-grid');
+      quotaTiles.appendChild(tile(S.quota_limit, monthly.limit_reported ? money(monthly.limit) : '—'));
+      quotaTiles.appendChild(tile(S.quota_used, monthly.known ? money(monthly.used) : '—'));
+      quotaTiles.appendChild(tile(S.quota_remaining, monthly.remaining_reported ? money(monthly.remaining) : '—'));
+      quotaTiles.appendChild(tile(S.quota_purchased, monthly.purchased_reported ? money(monthly.purchased) : '—'));
+      quotaTiles.appendChild(tile(S.quota_free, monthly.free_reported ? money(monthly.free) : '—'));
+      quotaBody.appendChild(quotaTiles);
+    }
+    if (view.usage) {
+      var stats = element('div', 'quota-grid');
+      stats.appendChild(tile(S.usage_requests, String(view.usage.requests), view.usage.failed + ' ' + S.usage_failed));
+      stats.appendChild(tile(S.usage_success, view.usage.success_rate + '%'));
+      stats.appendChild(tile(S.usage_spend, moneyExact(view.usage.cost), money(view.usage.credits) + ' credits'));
+      stats.appendChild(tile(
+        S.usage_tokens,
+        tokens(view.usage.tokens_in + view.usage.tokens_out),
+        tokens(view.usage.tokens_in) + ' ' + S.tokens_in + ' / ' + tokens(view.usage.tokens_out) + ' ' + S.tokens_out
+      ));
+      quotaBody.appendChild(stats);
+    }
+    if (!view.monthly && !(view.windows || []).length && !view.usage) {
+      quotaBody.appendChild(element('p', 'muted small', S.quota_empty || ''));
+    }
+    (view.failures || []).forEach(function (failure) {
+      quotaBody.appendChild(element('p', 'muted small', failure));
+    });
+  }
+
+  function openQuota(account) {
+    quotaTitle.textContent = account.label || account.file;
+    quotaBody.innerHTML = '';
+    quotaBody.appendChild(element('p', 'muted small', S.loading || ''));
+    quotaOverlay.hidden = false;
+    call('quota', { file: account.file }).then(function (result) {
+      quotaBody.innerHTML = '';
+      if (!result || result.ok === false) {
+        quotaBody.appendChild(element('p', 'muted small', (result && result.error) || S.failed));
+        return;
+      }
+      renderQuota(result.data || {});
     });
   }
 
@@ -434,6 +639,11 @@ const pageRuntime = `
       actions.appendChild(button(account.disabled ? S.enable : S.disable, '', function () {
         return call('toggle', { file: account.file, disabled: account.disabled ? '0' : '1' });
       }));
+      var quotaBtn = document.createElement('button');
+      quotaBtn.className = 'btn ghost';
+      quotaBtn.textContent = S.quota;
+      quotaBtn.addEventListener('click', function () { openQuota(account); });
+      actions.appendChild(quotaBtn);
       actions.appendChild(button(S.edit, '', function () {
         openModal(account);
         return Promise.resolve(null);
@@ -478,7 +688,13 @@ const pageRuntime = `
   document.getElementById('addAccount').addEventListener('click', function () { openModal(null); });
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', function (event) { if (event.target === overlay) closeModal(); });
-  document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !overlay.hidden) closeModal(); });
+  document.getElementById('quotaClose').addEventListener('click', function () { quotaOverlay.hidden = true; });
+  quotaOverlay.addEventListener('click', function (event) { if (event.target === quotaOverlay) quotaOverlay.hidden = true; });
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== 'Escape') return;
+    if (!quotaOverlay.hidden) { quotaOverlay.hidden = true; return; }
+    if (!overlay.hidden) closeModal();
+  });
 
   document.getElementById('modalSave').addEventListener('click', function () {
     var key = keyInput.value.trim();

@@ -550,3 +550,19 @@ func TestAccountsQuotaActionUnknownFile(t *testing.T) {
 		t.Fatalf("payload = %+v, want a clear error", payload)
 	}
 }
+
+func TestAccountsPageHasQuotaPanel(t *testing.T) {
+	html := AccountsPageHTML("zh")
+	for _, want := range []string{`id="quotaOverlay"`, `id="quotaBody"`, `id="quotaClose"`, `.meter`, `call('quota'`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("page is missing %q", want)
+		}
+	}
+	if !strings.Contains(html, "额度") || !strings.Contains(html, "月额度上限") {
+		t.Error("page is missing the zh quota copy")
+	}
+	english := AccountsPageHTML("en")
+	if !strings.Contains(english, "Quota") || !strings.Contains(english, "5-hour window") {
+		t.Error("page is missing the en quota copy")
+	}
+}
