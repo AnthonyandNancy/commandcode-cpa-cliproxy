@@ -36,9 +36,9 @@ type capabilities struct {
 
 // registration is the plugin.register / plugin.reconfigure payload.
 type registration struct {
-	SchemaVersion uint32         `json:"schema_version"`
-	Metadata      rpcMetadata    `json:"metadata"`
-	Capabilities  capabilities   `json:"capabilities"`
+	SchemaVersion uint32       `json:"schema_version"`
+	Metadata      rpcMetadata  `json:"metadata"`
+	Capabilities  capabilities `json:"capabilities"`
 }
 
 // rpcMetadata mirrors pluginapi.Metadata. It deliberately carries no JSON tags:

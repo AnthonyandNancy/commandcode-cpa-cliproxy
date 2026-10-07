@@ -15,11 +15,6 @@ import (
 // StaticModels is implemented in models.go (Task 5).
 var StaticModels = func() []pluginapi.ModelInfo { return nil }
 
-// handleAuthParse is implemented in account.go (Task 2).
-var handleAuthParse = func(request []byte) ([]byte, error) {
-	return nil, fmt.Errorf("auth.parse is not implemented yet")
-}
-
 // handleModelForAuth is implemented in models.go (Task 5).
 var handleModelForAuth = func(request []byte) ([]byte, error) {
 	var req pluginapi.AuthModelRequest
