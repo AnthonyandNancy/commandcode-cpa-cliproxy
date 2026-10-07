@@ -11,6 +11,9 @@
 
 要求：Go 1.26+、CGO 可用、C 编译器可用。产物架构必须与 CPA 进程一致。
 
+> **Windows 构建注意**：MinGW 下 `-o xxx-v0.1.0.dll` 这类「输出名自带 `-v<版本>`」会触发链接脚本冲突（`export_file.def ... appears multiple times`）。请先构建成 `commandcode.dll`，再复制/重命名为 `commandcode-v0.1.0.dll`（宿主按文件名解析插件 ID 与版本，复制不影响 ABI）。
+> 已验证：产物只依赖 `KERNEL32.dll` 与系统 UCRT（Win10+ 自带），无需额外运行库。
+
 ## 2. 安装到 CPA
 
 ```

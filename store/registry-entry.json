@@ -10,7 +10,11 @@
       "repository": "https://github.com/OWNER/commandcode-cpa-cliproxy",
       "homepage": "https://github.com/OWNER/commandcode-cpa-cliproxy",
       "license": "MIT",
-      "tags": ["provider", "commandcode", "account-pool"],
+      "tags": [
+        "provider",
+        "commandcode",
+        "account-pool"
+      ],
       "install": {
         "type": "direct",
         "artifacts": [
@@ -18,8 +22,8 @@
             "goos": "windows",
             "goarch": "amd64",
             "url": "https://github.com/OWNER/commandcode-cpa-cliproxy/releases/download/v0.1.0/commandcode-v0.1.0-windows-amd64.zip",
-            "sha256": "REPLACE_WITH_SHA256",
-            "size": 0
+            "sha256": "1c87769cb3fd09a333402d2c32d9d7286979bfce30e4ad991f1b9b8fc7f29965",
+            "size": 13601598
           },
           {
             "goos": "linux",
