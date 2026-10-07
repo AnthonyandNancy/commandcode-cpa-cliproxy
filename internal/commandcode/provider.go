@@ -76,4 +76,10 @@ const (
 	EndpointFingerprint = "/alpha/fingerprint/record"
 	EndpointLifecycle   = "/alpha/lifecycle-events"
 	EndpointModels      = "/provider/v1/models"
+	// Account endpoints behind the account page's quota panel and CPAMP's
+	// credential quota: identity, usage totals, balances/windows, subscription.
+	EndpointWhoami               = "/alpha/whoami"
+	EndpointUsageSummary         = "/alpha/usage/summary"
+	EndpointBillingCredits       = "/alpha/billing/credits"
+	EndpointBillingSubscriptions = "/alpha/billing/subscriptions"
 )
