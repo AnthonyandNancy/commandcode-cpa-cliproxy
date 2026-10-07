@@ -34,7 +34,7 @@ func (e *UpstreamError) Error() string {
 		return ""
 	}
 	if e.Code != "" {
-		return fmt.Sprintf("%s: %s (upstream %d)", e.Type, e.Message, e.Status)
+		return fmt.Sprintf("%s: %s (upstream %d, code %s)", e.Type, e.Message, e.Status, e.Code)
 	}
 	return fmt.Sprintf("%s: %s (upstream %d)", e.Type, e.Message, e.Status)
 }
