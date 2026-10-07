@@ -1,0 +1,6 @@
+# Build output (shared libraries are release assets, not source).
+dist/
+*.dll
+*.so
+*.dylib
+commandcode.h
