@@ -19,17 +19,14 @@ import (
 // a credential immediately while staying recoverable.
 const removedSuffix = ".removed-"
 
-// ManagementResources declares the plugin-owned pages. The accounts page carries
-// a menu entry; the action endpoints are menu-less so they add no sidebar items.
+// ManagementResources declares the plugin-owned page. Everything the page needs
+// is served from this one route and selected with ?action=..., because sibling
+// sub-paths under a plugin resource base are not guaranteed to survive every
+// deployment shape (CPA behind a panel proxy, custom reverse proxies, ...). The
+// menu route itself is the one path the host always exposes.
 func ManagementResources() []pluginapi.ResourceRoute {
 	return []pluginapi.ResourceRoute{
 		{Path: "/accounts", Menu: "CommandCode 账号 / Accounts", Description: "管理 CommandCode 账号（新增 / 编辑 / 启停 / 删除）"},
-		{Path: "/accounts/data", Description: "账号列表与状态（JSON）"},
-		{Path: "/accounts/save", Description: "新增或编辑账号（API key 走请求头）"},
-		{Path: "/accounts/toggle", Description: "启用或停用账号"},
-		{Path: "/accounts/remove", Description: "移出账号（可恢复）"},
-		{Path: "/accounts/restore", Description: "恢复被移出的账号"},
-		{Path: "/accounts/purge", Description: "彻底删除被移出的账号"},
 	}
 }
 
@@ -68,9 +65,10 @@ func handleManagementRequest(raw []byte) ([]byte, error) {
 	path := strings.TrimRight(req.Path, "/")
 	cfg := CurrentConfig()
 	lang := resolveLang(req, cfg)
+	action := strings.ToLower(strings.TrimSpace(req.Query.Get("action")))
 
 	switch {
-	case strings.HasSuffix(path, "/accounts/data"):
+	case action == "data":
 		views, errList := listAccountViews()
 		if errList != nil {
 			return jsonResponse(http.StatusOK, managementJSON{OK: false, Error: errList.Error()})
@@ -82,18 +80,18 @@ func handleManagementRequest(raw []byte) ([]byte, error) {
 			"version":       Version,
 		}})
 
-	case strings.HasSuffix(path, "/accounts/save"):
+	case action == "save":
 		return handleAccountSave(req, cfg, lang)
-	case strings.HasSuffix(path, "/accounts/toggle"):
+	case action == "toggle":
 		return handleAccountToggle(req, cfg, lang)
-	case strings.HasSuffix(path, "/accounts/remove"):
+	case action == "remove":
 		return handleAccountRemove(req, cfg, lang)
-	case strings.HasSuffix(path, "/accounts/restore"):
+	case action == "restore":
 		return handleAccountRestore(req, cfg, lang)
-	case strings.HasSuffix(path, "/accounts/purge"):
+	case action == "purge":
 		return handleAccountPurge(req, cfg, lang)
 
-	case strings.HasSuffix(path, "/accounts"):
+	case action == "" && strings.HasSuffix(path, "/accounts"):
 		if strings.EqualFold(strings.TrimSpace(req.Query.Get("format")), "json") {
 			views, errList := listAccountViews()
 			if errList != nil {
@@ -103,7 +101,7 @@ func handleManagementRequest(raw []byte) ([]byte, error) {
 		}
 		return htmlResponse(http.StatusOK, AccountsPageHTML(lang))
 	}
-	return jsonResponse(http.StatusNotFound, managementJSON{OK: false, Error: "unknown path: " + req.Path})
+	return jsonResponse(http.StatusNotFound, managementJSON{OK: false, Error: "unknown action: " + action})
 }
 
 // listAccountViews merges the live credentials with the removed files so the

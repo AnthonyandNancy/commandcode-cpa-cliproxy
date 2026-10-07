@@ -451,3 +451,12 @@
 - **Linux / macOS 构建**：本机只有 Windows 目标 C 编译器（MinGW），无法产出 Linux/macOS 动态库；命令已写入 `Makefile` 与 `docs/DEPLOY.md`。
 - **真实上游联调**：本环境无法访问 `commandcode.ai`（域名解析到非公网地址），也没有 `user_*` 凭据；上游协议按 commandcode-proxy 的既有实现移植并由假上游测试覆盖，真实账号冒烟步骤见 `docs/DEPLOY.md` §5。
 - **真实 CPA 加载**：本环境没有运行中的 CPA 实例；ABI 导出符号（`cliproxy_plugin_init` / `cliproxyPluginCall` / `cliproxyPluginFree` / `cliproxyPluginShutdown`）已用 `nm` 核对存在。
+
+### 交付后修复（用户实测反馈，2026-10-07）
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| 账号页列表显示 `HTTP 404` | 页面把数据/动作请求打到兄弟子路径（`/accounts/data`、`/accounts/save` …），这类子路径在「面板在前、反代在后」的部署形态下不一定可达；只有菜单路由被证明可达 | 资源声明收敛为**唯一菜单路由** `/accounts`；页面所有请求改为打到**自身 URL + `?action=`**（`base = location.pathname`），彻底移除对子路径与部署前缀的依赖 |
+| 新增账号表单占据页面顶部、影响展示 | 表单是内联卡片 | 改为**弹窗**：标题栏「新增账号」按钮打开模态框（遮罩点击/Esc 关闭），编辑复用同一弹窗（key 留空=不改） |
+
+回归防护：新增 `TestAccountsPageUsesOwnRouteAndModal`（断言页面派生自身路径、使用 `?action=`、不含硬编码子路径、含弹窗元素、旧内联表单已移除）。

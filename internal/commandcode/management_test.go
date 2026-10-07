@@ -159,10 +159,13 @@ func TestManagementResourcesDeclaration(t *testing.T) {
 	if menus != 1 {
 		t.Errorf("menu entries = %d, want exactly one visible page", menus)
 	}
-	for _, want := range []string{"/accounts", "/accounts/data", "/accounts/save", "/accounts/toggle", "/accounts/remove", "/accounts/restore", "/accounts/purge"} {
-		if !paths[want] {
-			t.Errorf("resource %q is missing", want)
-		}
+	// Everything is served from the menu route: sub-paths under a plugin resource
+	// base are not guaranteed to survive every deployment shape.
+	if len(resources) != 1 || !paths["/accounts"] {
+		t.Errorf("resources = %+v, want exactly the /accounts menu route", resources)
+	}
+	if resources[0].Description == "" {
+		t.Error("the resource has no description")
 	}
 }
 
@@ -205,7 +208,7 @@ func TestAccountsDataListsOnlyCommandCode(t *testing.T) {
 	})
 	_ = stub
 
-	raw := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/data", map[string]string{"format": "json"}, http.Header{})
+	raw := accountAction("data", nil, http.Header{})
 	body := decodeManagement(t, mustFrame(t, raw)).Body
 
 	var payload struct {
@@ -248,7 +251,7 @@ func TestAccountSaveIsIdempotentAndPreservesHostFields(t *testing.T) {
 
 	headers := http.Header{}
 	headers.Set("X-CommandCode-Api-Key", key)
-	raw := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/save",
+	raw := accountAction("save",
 		map[string]string{"file": fileName, "label": "工作号", "base_url": "https://api.commandcode.ai/"}, headers)
 
 	body := decodeManagement(t, mustFrame(t, raw)).Body
@@ -288,13 +291,13 @@ func TestAccountSaveValidationAndWriteSwitch(t *testing.T) {
 
 	headers := http.Header{}
 	headers.Set("X-CommandCode-Api-Key", "sk-not-a-commandcode-key")
-	raw := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/save", map[string]string{}, headers)
+	raw := accountAction("save", nil, headers)
 	if body := string(decodeManagement(t, mustFrame(t, raw)).Body); !strings.Contains(body, `"ok":false`) || !strings.Contains(body, "user_") {
 		t.Errorf("prefix validation response = %s", body)
 	}
 
 	headers.Set("X-CommandCode-Api-Key", "")
-	raw = managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/save", map[string]string{}, headers)
+	raw = accountAction("save", nil, headers)
 	if body := string(decodeManagement(t, mustFrame(t, raw)).Body); !strings.Contains(body, `"ok":false`) {
 		t.Errorf("missing-key response = %s", body)
 	}
@@ -304,7 +307,7 @@ func TestAccountSaveValidationAndWriteSwitch(t *testing.T) {
 	defer ApplyConfigYAML([]byte("allow-page-write: true"))
 	savesBefore := len(stub.saved)
 	headers.Set("X-CommandCode-Api-Key", "user_abcd123456")
-	raw = managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/save", map[string]string{}, headers)
+	raw = accountAction("save", nil, headers)
 	if body := string(decodeManagement(t, mustFrame(t, raw)).Body); !strings.Contains(body, `"ok":false`) {
 		t.Errorf("write-disabled response = %s", body)
 	}
@@ -320,8 +323,7 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 		fileName: `{"type":"commandcode","api_key":"` + key + `","priority":5}`,
 	})
 
-	disable := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/toggle",
-		map[string]string{"file": fileName, "disabled": "1"}, http.Header{})
+	disable := accountAction("toggle", map[string]string{"file": fileName, "disabled": "1"}, http.Header{})
 	if body := string(decodeManagement(t, mustFrame(t, disable)).Body); !strings.Contains(body, `"ok":true`) {
 		t.Fatalf("toggle failed: %s", body)
 	}
@@ -335,8 +337,7 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 	}
 
 	// Remove renames the file out of the scan pattern.
-	remove := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/remove",
-		map[string]string{"file": fileName}, http.Header{})
+	remove := accountAction("remove", map[string]string{"file": fileName}, http.Header{})
 	if body := string(decodeManagement(t, mustFrame(t, remove)).Body); !strings.Contains(body, `"ok":true`) {
 		t.Fatalf("remove failed: %s", body)
 	}
@@ -355,7 +356,7 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 	}
 
 	// The data endpoint surfaces it as recoverable.
-	data := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/data", map[string]string{"format": "json"}, http.Header{})
+	data := accountAction("data", nil, http.Header{})
 	body := decodeManagement(t, mustFrame(t, data)).Body
 	var payload struct {
 		Data struct {
@@ -377,8 +378,7 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 	}
 
 	// Restore brings it back.
-	restore := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/restore",
-		map[string]string{"file": removedName}, http.Header{})
+	restore := accountAction("restore", map[string]string{"file": removedName}, http.Header{})
 	if body := string(decodeManagement(t, mustFrame(t, restore)).Body); !strings.Contains(body, `"ok":true`) {
 		t.Fatalf("restore failed: %s", body)
 	}
@@ -387,11 +387,9 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 	}
 
 	// Purge removes it for good.
-	remove = managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/remove",
-		map[string]string{"file": fileName}, http.Header{})
+	remove = accountAction("remove", map[string]string{"file": fileName}, http.Header{})
 	_ = decodeManagement(t, mustFrame(t, remove))
-	purge := managementRequest("GET", "/v0/resource/plugins/commandcode/accounts/purge",
-		map[string]string{"file": removedName}, http.Header{})
+	purge := accountAction("purge", map[string]string{"file": removedName}, http.Header{})
 	if body := string(decodeManagement(t, mustFrame(t, purge)).Body); !strings.Contains(body, `"ok":true`) {
 		t.Fatalf("purge failed: %s", body)
 	}
@@ -403,11 +401,24 @@ func TestAccountToggleRemoveRestorePurge(t *testing.T) {
 func TestUnknownManagementPath(t *testing.T) {
 	stub := newAuthStubHost(t, map[string]string{})
 	_ = stub
-	raw := managementRequest("GET", "/v0/resource/plugins/commandcode/nope", map[string]string{}, http.Header{})
+	raw := accountAction("nope", nil, http.Header{})
 	response := decodeManagement(t, mustFrame(t, raw))
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", response.StatusCode)
 	}
+}
+
+// accountAction builds a request for the plugin's single resource route, which
+// selects behaviour with ?action=... (never a sibling sub-path).
+func accountAction(action string, params map[string]string, headers http.Header) []byte {
+	query := map[string]string{}
+	if action != "" {
+		query["action"] = action
+	}
+	for key, value := range params {
+		query[key] = value
+	}
+	return managementRequest("GET", "/v0/resource/plugins/"+ProviderID+"/accounts", query, headers)
 }
 
 func mustFrame(t *testing.T, request []byte) []byte {
@@ -420,3 +431,37 @@ func mustFrame(t *testing.T, request []byte) []byte {
 }
 
 var _ = httptest.NewServer
+
+// TestAccountsPageUsesOwnRouteAndModal pins the two fixes for the reported
+// breakage: the page must call its own URL with ?action= (a sibling sub-path may
+// 404 behind a panel proxy) and adding an account must open a dialog instead of
+// pushing the layout around.
+func TestAccountsPageUsesOwnRouteAndModal(t *testing.T) {
+	page := AccountsPageHTML("zh")
+
+	if !strings.Contains(page, "window.location.pathname") {
+		t.Error("the page must derive its endpoints from its own location")
+	}
+	if !strings.Contains(page, "?action=") {
+		t.Error("the page must call actions through ?action=")
+	}
+	for _, path := range []string{"/accounts/data", "/accounts/save", "/accounts/toggle", "/accounts/remove"} {
+		if strings.Contains(page, path) {
+			t.Errorf("the page still hardcodes the sub-path %s", path)
+		}
+	}
+	if !strings.Contains(page, "id=\"overlay\"") || !strings.Contains(page, "id=\"addAccount\"") {
+		t.Error("adding an account must open a modal dialog from a header button")
+	}
+	if !strings.Contains(page, "function openModal") {
+		t.Error("the modal open handler is missing")
+	}
+	if strings.Contains(page, "id=\"save\"") {
+		t.Error("the old inline add form is still present")
+	}
+
+	en := AccountsPageHTML("en")
+	if !strings.Contains(en, "CommandCode Accounts") || !strings.Contains(en, "Add account") {
+		t.Error("the en page is missing its strings")
+	}
+}
