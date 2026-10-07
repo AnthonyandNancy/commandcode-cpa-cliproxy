@@ -32,6 +32,7 @@ type capabilities struct {
 	ExecutorInputFormats  []string                     `json:"executor_input_formats,omitempty"`
 	ExecutorOutputFormats []string                     `json:"executor_output_formats,omitempty"`
 	ManagementAPI         bool                         `json:"management_api"`
+	QuotaProvider         bool                         `json:"quota_provider"`
 }
 
 // registration is the plugin.register / plugin.reconfigure payload.
@@ -99,6 +100,18 @@ func HandleMethod(method string, request []byte) ([]byte, error) {
 
 	case pluginabi.MethodManagementHandle:
 		return handleManagementRequest(request)
+
+	case pluginabi.MethodQuotaIdentifier:
+		return handleQuotaIdentifier(request)
+
+	case pluginabi.MethodQuotaDescribe:
+		return handleQuotaDescribe(request)
+
+	case pluginabi.MethodQuotaFetch:
+		return handleQuotaFetch(request)
+
+	case pluginabi.MethodQuotaReset:
+		return handleQuotaReset(request)
 	}
 	return nil, fmt.Errorf("unknown method: %s", method)
 }
@@ -131,6 +144,7 @@ func registrationPayload() registration {
 			ExecutorInputFormats:  []string{ExecutorFormat},
 			ExecutorOutputFormats: []string{ExecutorFormat},
 			ManagementAPI:         true,
+			QuotaProvider:         true,
 		},
 	}
 }

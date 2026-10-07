@@ -1,10 +1,61 @@
 package commandcode
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
+
+// handleQuotaIdentifier implements quota.identifier. The identifier is the
+// provider key CPAMP matches credentials on ("commandcode"), the same value
+// auth.identifier and executor.identifier already answer with.
+func handleQuotaIdentifier(request []byte) ([]byte, error) {
+	return okEnvelope(map[string]string{"identifier": ProviderID}), nil
+}
+
+// handleQuotaDescribe implements quota.describe: this provider serves its own
+// credentials only and has no reset operation (the windows roll upstream).
+func handleQuotaDescribe(request []byte) ([]byte, error) {
+	return okEnvelope(pluginapi.QuotaDescribeResponse{
+		SupportedProviders: []string{ProviderID},
+		DisplayName:        "CommandCode",
+		SupportsReset:      false,
+	}), nil
+}
+
+// handleQuotaFetch implements quota.fetch: CPAMP credential management asks for
+// one credential's quota by auth index; the host hands us the credential JSON
+// in StorageJSON.
+func handleQuotaFetch(request []byte) ([]byte, error) {
+	var req pluginapi.QuotaFetchRequest
+	if err := json.Unmarshal(request, &req); err != nil {
+		return nil, err
+	}
+	account, handled, errParse := ParseAccount(req.StorageJSON)
+	if !handled {
+		return nil, fmt.Errorf("credential is not a %s account", ProviderID)
+	}
+	if errParse != nil {
+		return nil, errParse
+	}
+	report, errFetch := FetchQuotaReport(context.Background(), account, CurrentConfig())
+	if errFetch != nil {
+		return nil, errFetch
+	}
+	return okEnvelope(QuotaFetchResponseFor(report)), nil
+}
+
+// handleQuotaReset implements quota.reset. CommandCode meters rolling windows
+// upstream and exposes no reset call, so the answer is a clear refusal instead
+// of an unknown-method failure: the management endpoint always calls reset.
+func handleQuotaReset(request []byte) ([]byte, error) {
+	return okEnvelope(pluginapi.QuotaResetResponse{
+		Success: false,
+		Message: "CommandCode 不支持重置额度窗口（窗口由上游滚动重置）",
+	}), nil
+}
 
 // QuotaFetchResponseFor maps one report onto the host's normalized quota frame.
 // CPAMP credential management renders it exactly like the Codex quota: a plan

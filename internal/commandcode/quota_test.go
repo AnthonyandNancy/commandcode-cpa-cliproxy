@@ -2,11 +2,14 @@ package commandcode
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
+
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 func TestSubscriptionPlanInfoLongestPrefix(t *testing.T) {
@@ -336,5 +339,111 @@ func TestQuotaFetchResponseForUncappedWindowHasZeroFraction(t *testing.T) {
 	resp := QuotaFetchResponseFor(report)
 	if len(resp.Groups) != 1 || resp.Groups[0].Buckets[0].RemainingFraction != 0 {
 		t.Fatalf("buckets = %+v, want an uncapped bucket with zero ratio", resp.Groups)
+	}
+}
+
+func decodeQuotaEnvelope(t *testing.T, frame []byte, out any) {
+	t.Helper()
+	var envelope struct {
+		OK     bool            `json:"ok"`
+		Result json.RawMessage `json:"result"`
+	}
+	if err := json.Unmarshal(frame, &envelope); err != nil {
+		t.Fatalf("frame is not valid JSON: %v", err)
+	}
+	if !envelope.OK {
+		t.Fatalf("frame reported a failure: %s", frame)
+	}
+	if err := json.Unmarshal(envelope.Result, out); err != nil {
+		t.Fatalf("result decode: %v", err)
+	}
+}
+
+func TestQuotaIdentifierDescribeReset(t *testing.T) {
+	raw, err := handleQuotaIdentifier(nil)
+	if err != nil {
+		t.Fatalf("handleQuotaIdentifier() error = %v", err)
+	}
+	var identifier struct {
+		Identifier string `json:"identifier"`
+	}
+	decodeQuotaEnvelope(t, raw, &identifier)
+	if identifier.Identifier != ProviderID {
+		t.Errorf("identifier = %q, want %q", identifier.Identifier, ProviderID)
+	}
+
+	raw, err = handleQuotaDescribe(nil)
+	if err != nil {
+		t.Fatalf("handleQuotaDescribe() error = %v", err)
+	}
+	var describe pluginapi.QuotaDescribeResponse
+	decodeQuotaEnvelope(t, raw, &describe)
+	if len(describe.SupportedProviders) != 1 || describe.SupportedProviders[0] != ProviderID {
+		t.Errorf("supported providers = %v, want [%s]", describe.SupportedProviders, ProviderID)
+	}
+	if describe.SupportsReset {
+		t.Error("supports_reset = true, want false")
+	}
+
+	raw, err = handleQuotaReset(nil)
+	if err != nil {
+		t.Fatalf("handleQuotaReset() error = %v", err)
+	}
+	var reset pluginapi.QuotaResetResponse
+	decodeQuotaEnvelope(t, raw, &reset)
+	if reset.Success || reset.Message == "" {
+		t.Errorf("reset = %+v, want a clear refusal", reset)
+	}
+}
+
+func TestQuotaFetchHandler(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	server := httptest.NewServer(quotaFixtureHandler(t))
+	defer server.Close()
+
+	previous := CurrentConfig()
+	ApplyConfigYAML([]byte("base-url: " + server.URL))
+	t.Cleanup(func() { runtimeConfigValue.Store(previous); resetQuotaCache() })
+
+	request, _ := json.Marshal(pluginapi.QuotaFetchRequest{
+		AuthIndex:   "commandcode-abc.json",
+		AuthID:      "commandcode-abc.json",
+		Provider:    ProviderID,
+		StorageJSON: []byte(`{"type":"commandcode","api_key":"user_test1234567890"}`),
+	})
+	raw, err := handleQuotaFetch(request)
+	if err != nil {
+		t.Fatalf("handleQuotaFetch() error = %v", err)
+	}
+	var response pluginapi.QuotaFetchResponse
+	decodeQuotaEnvelope(t, raw, &response)
+	if response.Subscription == nil || response.Subscription.TierID != "individual-goat" {
+		t.Fatalf("subscription = %+v, want GOAT", response.Subscription)
+	}
+	if len(response.Groups) != 1 || len(response.Groups[0].Buckets) != 3 {
+		t.Fatalf("groups = %+v, want three buckets", response.Groups)
+	}
+}
+
+func TestQuotaFetchHandlerRejectsForeignCredential(t *testing.T) {
+	request, _ := json.Marshal(pluginapi.QuotaFetchRequest{Provider: "other", StorageJSON: []byte(`{"type":"other","api_key":"x"}`)})
+	if _, err := handleQuotaFetch(request); err == nil {
+		t.Fatal("handleQuotaFetch(foreign) error = nil, want a rejection")
+	}
+}
+
+func TestHandleMethodDispatchesQuota(t *testing.T) {
+	raw, err := HandleMethod("quota.identifier", nil)
+	if err != nil {
+		t.Fatalf("HandleMethod(quota.identifier) error = %v", err)
+	}
+	var identifier struct {
+		Identifier string `json:"identifier"`
+	}
+	decodeQuotaEnvelope(t, raw, &identifier)
+	if identifier.Identifier != ProviderID {
+		t.Errorf("identifier = %q, want %q", identifier.Identifier, ProviderID)
 	}
 }
