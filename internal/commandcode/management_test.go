@@ -473,3 +473,80 @@ func TestAccountsPageUsesOwnRouteAndModal(t *testing.T) {
 		t.Error("the en page is missing its strings")
 	}
 }
+
+func TestAccountsQuotaAction(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	upstream := httptest.NewServer(quotaFixtureHandler(t))
+	defer upstream.Close()
+
+	newAuthStubHost(t, map[string]string{
+		"commandcode-abc.json": `{"type":"commandcode","api_key":"user_test1234567890"}`,
+	})
+
+	previous := CurrentConfig()
+	ApplyConfigYAML([]byte("base-url: " + upstream.URL + "\nallow-page-write: false\n"))
+	t.Cleanup(func() { runtimeConfigValue.Store(previous); resetQuotaCache() })
+
+	response := decodeManagement(t, mustFrame(t, accountAction("quota", map[string]string{
+		"file": "commandcode-abc.json",
+	}, nil)))
+	var payload struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			PlanName   string `json:"plan_name"`
+			PeriodEnds int64  `json:"period_ends"`
+			Monthly    *struct {
+				Known   bool    `json:"known"`
+				Used    float64 `json:"used"`
+				Percent int     `json:"percent"`
+			} `json:"monthly"`
+			Windows []struct {
+				Key     string `json:"key"`
+				Percent int    `json:"percent"`
+			} `json:"windows"`
+			Usage *struct {
+				Requests float64 `json:"requests"`
+				Failed   float64 `json:"failed"`
+			} `json:"usage"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(response.Body, &payload); err != nil {
+		t.Fatalf("quota body decode: %v", err)
+	}
+	if !payload.OK {
+		t.Fatalf("quota action failed: %s", response.Body)
+	}
+	if payload.Data.PlanName != "GOAT" || payload.Data.Monthly == nil || !payload.Data.Monthly.Known {
+		t.Fatalf("data = %+v, want the GOAT monthly meter", payload.Data)
+	}
+	if payload.Data.Monthly.Used != 40.64 || payload.Data.Monthly.Percent != 58 {
+		t.Errorf("monthly = %+v, want 40.64 / 58%%", payload.Data.Monthly)
+	}
+	if len(payload.Data.Windows) != 2 || payload.Data.Windows[0].Key != "five_hour" || payload.Data.Windows[0].Percent != 16 {
+		t.Errorf("windows = %+v, want five_hour 16%% then weekly", payload.Data.Windows)
+	}
+	if payload.Data.Usage == nil || payload.Data.Usage.Requests != 14779 || payload.Data.Usage.Failed != 19 {
+		t.Errorf("usage = %+v, want the summary totals", payload.Data.Usage)
+	}
+}
+
+func TestAccountsQuotaActionUnknownFile(t *testing.T) {
+	newAuthStubHost(t, map[string]string{
+		"commandcode-abc.json": `{"type":"commandcode","api_key":"user_test1234567890"}`,
+	})
+	response := decodeManagement(t, mustFrame(t, accountAction("quota", map[string]string{
+		"file": "no-such-file.json",
+	}, nil)))
+	var payload struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(response.Body, &payload); err != nil {
+		t.Fatalf("body decode: %v", err)
+	}
+	if payload.OK || payload.Error == "" {
+		t.Fatalf("payload = %+v, want a clear error", payload)
+	}
+}

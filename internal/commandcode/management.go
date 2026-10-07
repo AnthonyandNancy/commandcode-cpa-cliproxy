@@ -1,6 +1,7 @@
 package commandcode
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -79,6 +80,20 @@ func handleManagementRequest(raw []byte) ([]byte, error) {
 			"provider":      ProviderID,
 			"version":       Version,
 		}})
+
+	case action == "quota":
+		// Read-only: the quota panel must stay available when page writes are
+		// disabled. loadAccountByFile resolves the credential through the host
+		// so the API key never travels to the browser.
+		account, _, errLoad := loadAccountByFile(strings.TrimSpace(req.Query.Get("file")))
+		if errLoad != nil {
+			return jsonResponse(http.StatusOK, managementJSON{OK: false, Error: errLoad.Error()})
+		}
+		report, errFetch := FetchQuotaReport(context.Background(), account, cfg)
+		if errFetch != nil {
+			return jsonResponse(http.StatusOK, managementJSON{OK: false, Error: errFetch.Error()})
+		}
+		return jsonResponse(http.StatusOK, managementJSON{OK: true, Data: buildQuotaView(report)})
 
 	case action == "save":
 		return handleAccountSave(req, cfg, lang)
