@@ -39,6 +39,7 @@ var subscriptionPlans = []struct {
 	{Prefix: "individual-max", Name: "Max", MonthlyCredits: 150},
 	{Prefix: "individual-pro-v1", Name: "Pro", MonthlyCredits: 80},
 	{Prefix: "individual-pro", Name: "Pro", MonthlyCredits: 30},
+	{Prefix: "individual-go-v1", Name: "Go", MonthlyCredits: 10},
 	{Prefix: "individual-go", Name: "Go", MonthlyCredits: 10},
 	{Prefix: "teams-pro", Name: "Teams Pro", MonthlyCredits: 40},
 }
@@ -213,10 +214,12 @@ func (r QuotaReport) HasData() bool {
 
 // FetchQuotaReport reads one credential's subscription, credits, metered
 // windows and usage totals from the /alpha account endpoints. whoami runs
-// first because it yields the org id the subscription query needs; the other
-// three run in parallel. A single dead endpoint is recorded in Failures and
-// leaves the rest of the report usable; only a report with no usable endpoint
-// at all is an error. The credential itself is never logged.
+// first because it yields the org id the subscription query needs; credits and
+// the subscription then run in parallel. Usage waits for the subscription so
+// its query can use the official billing-period start. A single dead endpoint
+// is recorded in Failures and leaves the rest of the report usable; only a
+// report with no usable endpoint at all is an error. The credential itself is
+// never logged.
 func FetchQuotaReport(ctx context.Context, account Account, cfg RuntimeConfig) (QuotaReport, error) {
 	if report, ok := quotaCacheGet(account.APIKey); ok {
 		return report, nil
@@ -255,7 +258,6 @@ func FetchQuotaReport(ctx context.Context, account Account, cfg RuntimeConfig) (
 	var (
 		mu           sync.Mutex
 		wg           sync.WaitGroup
-		usageDoc     map[string]any
 		creditsDoc   map[string]any
 		subscription map[string]any
 	)
@@ -270,11 +272,19 @@ func FetchQuotaReport(ctx context.Context, account Account, cfg RuntimeConfig) (
 		}
 		*target = doc
 	}
-	wg.Add(3)
-	go fetch(EndpointUsageSummary, &usageDoc)
+	wg.Add(2)
 	go fetch(EndpointBillingCredits, &creditsDoc)
 	go fetch(subscriptionPath, &subscription)
 	wg.Wait()
+
+	usagePath := EndpointUsageSummary
+	if currentPeriodStart, ok := quotaPeriodStart(subscription); ok {
+		usagePath += "?" + url.Values{"since": []string{quotaPeriodStartValue(currentPeriodStart)}}.Encode()
+	}
+	usageDoc, errUsage := quotaGetJSON(reqCtx, client, base, usagePath, headers)
+	if errUsage != nil {
+		report.Failures = append(report.Failures, usagePath+": "+errUsage.Error())
+	}
 
 	report.Credits = parseQuotaCredits(creditsDoc)
 	report.Usage = parseQuotaUsage(usageDoc)
@@ -284,6 +294,53 @@ func FetchQuotaReport(ctx context.Context, account Account, cfg RuntimeConfig) (
 	}
 	quotaCachePut(account.APIKey, report)
 	return report, nil
+}
+
+// quotaPeriodStart reads the subscription's billing-period start without
+// normalizing it: the upstream accepts the value in the same representation it
+// published, and an absent value must not become a locally invented period.
+func quotaPeriodStart(subscription map[string]any) (any, bool) {
+	data := recordValue(subscription["data"])
+	if data == nil {
+		return nil, false
+	}
+	value, ok := data["currentPeriodStart"]
+	if !ok || value == nil {
+		return nil, false
+	}
+	switch typed := value.(type) {
+	case string:
+		if strings.TrimSpace(typed) == "" {
+			return nil, false
+		}
+	case float64:
+		if typed <= 0 {
+			return nil, false
+		}
+	case json.Number:
+		if typed.String() == "" {
+			return nil, false
+		}
+	default:
+		return nil, false
+	}
+	return value, true
+}
+
+// quotaPeriodStartValue keeps the upstream's representation stable. Decoded
+// JSON numbers are float64, and fmt.Sprint would turn a millisecond timestamp
+// into scientific notation.
+func quotaPeriodStartValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case float64:
+		return strconv.FormatInt(int64(typed), 10)
+	case json.Number:
+		return typed.String()
+	default:
+		return ""
+	}
 }
 
 // quotaGetJSON performs one authenticated GET and decodes a JSON object. A

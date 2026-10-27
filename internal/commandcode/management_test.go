@@ -671,21 +671,3 @@ func TestAccountsPageHasInlineWindows(t *testing.T) {
 		}
 	}
 }
-
-func TestAccountsPageHasCallableKeys(t *testing.T) {
-	zh := AccountsPageHTML("zh")
-	for _, want := range []string{`id="callableList"`, `id="callableAdd"`, `call('keys')`, `call('key_add'`, "可调用密钥", "CPAMP 认证配置的 api-keys"} {
-		if !strings.Contains(zh, want) {
-			t.Errorf("page is missing %q", want)
-		}
-	}
-	en := AccountsPageHTML("en")
-	for _, want := range []string{"Callable keys", "call('key_delete'", "not in the CPAMP auth api-keys list"} {
-		if !strings.Contains(en, want) {
-			t.Errorf("en page is missing %q", want)
-		}
-	}
-	if !strings.Contains(zh, "'X-CommandCode-Callable-Key': key") {
-		t.Error("the page must send the callable key as a request header")
-	}
-}

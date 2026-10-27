@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -21,6 +22,7 @@ func TestSubscriptionPlanInfoLongestPrefix(t *testing.T) {
 	}{
 		{"individual-goat", "GOAT", 70, true},
 		{"individual-go", "Go", 10, true},
+		{"individual-go-v1", "Go", 10, true},
 		{"individual-pro-v1", "Pro", 80, true},
 		{"individual-pro", "Pro", 30, true},
 		{"individual-provider", "Provider", 15, true},
@@ -446,4 +448,78 @@ func TestHandleMethodDispatchesQuota(t *testing.T) {
 	if identifier.Identifier != ProviderID {
 		t.Errorf("identifier = %q, want %q", identifier.Identifier, ProviderID)
 	}
+}
+
+func TestFetchQuotaReportPassesBillingPeriodStartToUsage(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	var usageQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case EndpointWhoami:
+			_, _ = w.Write([]byte(`{"user":{"name":"X"},"org":{"id":"o1"}}`))
+		case EndpointBillingCredits:
+			_, _ = w.Write([]byte(`{"credits":{"monthlyCredits":3},"windowLimits":{}}`))
+		case EndpointBillingSubscriptions:
+			_, _ = w.Write([]byte(`{"data":{"planId":"individual-go-v1","status":"active","currentPeriodStart":1790000000000,"currentPeriodEnd":1792272000000}}`))
+		case EndpointUsageSummary:
+			usageQuery = r.URL.RawQuery
+			_, _ = w.Write([]byte(`{"completedCount":2,"failedCount":0,"successRate":100}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	report, err := FetchQuotaReport(context.Background(), newTestAccount(server.URL), DefaultConfig())
+	if err != nil {
+		t.Fatalf("FetchQuotaReport() error = %v", err)
+	}
+	if got := parseQueryValue(usageQuery, "since"); got != "1790000000000" {
+		t.Errorf("usage since = %q, want the subscription currentPeriodStart", got)
+	}
+	if report.Plan.Name != "Go" || report.Plan.MonthlyCredits == nil || *report.Plan.MonthlyCredits != 10 {
+		t.Errorf("plan = %+v, want Go / 10", report.Plan)
+	}
+}
+
+func TestFetchQuotaReportOmitsSinceWithoutPeriodStart(t *testing.T) {
+	resetQuotaCache()
+	t.Cleanup(resetQuotaCache)
+
+	var usageQuery string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case EndpointWhoami:
+			_, _ = w.Write([]byte(`{"user":{"name":"X"},"org":{"id":"o1"}}`))
+		case EndpointBillingCredits:
+			_, _ = w.Write([]byte(`{"credits":{"monthlyCredits":3},"windowLimits":{}}`))
+		case EndpointBillingSubscriptions:
+			_, _ = w.Write([]byte(`{"data":{"planId":"individual-go-v1","status":"active"}}`))
+		case EndpointUsageSummary:
+			usageQuery = r.URL.RawQuery
+			_, _ = w.Write([]byte(`{"completedCount":1,"failedCount":0,"successRate":100}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	if _, err := FetchQuotaReport(context.Background(), newTestAccount(server.URL), DefaultConfig()); err != nil {
+		t.Fatalf("FetchQuotaReport() error = %v", err)
+	}
+	if got := parseQueryValue(usageQuery, "since"); got != "" {
+		t.Errorf("usage since = %q, want no invented period", got)
+	}
+}
+
+func parseQueryValue(raw, key string) string {
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return ""
+	}
+	return values.Get(key)
 }

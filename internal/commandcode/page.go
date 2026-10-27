@@ -10,154 +10,130 @@ import (
 // language means adding one map entry; the page itself never hardcodes text.
 var accountPageCopy = map[string]map[string]string{
 	"zh": {
-		"title":                   "CommandCode 账号",
-		"subtitle":                "账号与 CPA 凭据同一份数据：这里做的改动，CPAMP 凭证管理同样可见。",
-		"add":                     "新增账号",
-		"add_title":               "新增 CommandCode 账号",
-		"edit_title":              "编辑 CommandCode 账号",
-		"cancel":                  "取消",
-		"api_key":                 "CommandCode API Key（user_ 开头）",
-		"api_key_keep":            "留空表示不修改当前 Key",
-		"label":                   "显示名（可选）",
-		"base_url":                "上游地址（可选，默认官方）",
-		"save":                    "保存",
-		"save_hint":               "同一 Key 重复保存不会产生第二条账号。",
-		"list":                    "账号列表",
-		"refresh":                 "刷新",
-		"empty":                   "还没有账号。点击「新增账号」添加，或在 CPAMP 凭证管理中导入。",
-		"loading":                 "加载中…",
-		"cooldown":                "冷却至",
-		"enable":                  "启用",
-		"disable":                 "停用",
-		"edit":                    "编辑",
-		"remove":                  "移出",
-		"restore":                 "恢复",
-		"purge":                   "彻底删除",
-		"removed":                 "已移出（可恢复）",
-		"write_off":               "插件页写入已关闭（allow-page-write=false），当前为只读。",
-		"key_required":            "请输入 API Key。",
-		"key_prefix":              "API Key 必须以 user_ 开头。",
-		"base_url_invalid":        "上游地址必须以 http:// 或 https:// 开头。",
-		"file_required":           "缺少文件参数。",
-		"dir_unknown":             "无法定位凭据目录（请先导入一个账号或在 CPAMP 中导入）。",
-		"write_disabled":          "插件页写入已关闭。",
-		"remove_note":             "已移出，宿主重载后完成注销；可用「恢复」找回。",
-		"purge_confirm":           "彻底删除后无法恢复，确认继续？",
-		"remove_confirm":          "移出后该账号不再参与请求，可用「恢复」找回。确认继续？",
-		"panel_hint":              "删除/排序等操作也可以直接在 CPAMP 凭证管理里完成。",
-		"security":                "安全提示：该页面不经过管理密钥认证，只应在本机或受信网络访问；API Key 不会写入 URL 与日志。",
-		"quota":                   "额度",
-		"quota_title":             "额度与用量",
-		"close":                   "关闭",
-		"plan":                    "套餐",
-		"period_ends":             "账期截止",
-		"monthly":                 "月额度",
-		"window_5h":               "5 小时窗口",
-		"window_weekly":           "每周窗口",
-		"reset_at":                "重置于",
-		"quota_limit":             "月额度上限",
-		"quota_used":              "本月已用",
-		"quota_remaining":         "剩余",
-		"quota_purchased":         "已购",
-		"quota_free":              "赠送",
-		"quota_empty":             "上游未返回额度数据。",
-		"exhausted":               "已用尽",
-		"usage_requests":          "请求",
-		"usage_failed":            "失败",
-		"usage_success":           "成功率",
-		"usage_spend":             "花费",
-		"usage_tokens":            "Token",
-		"tokens_in":               "入",
-		"tokens_out":              "出",
-		"callable_title":          "可调用密钥",
-		"callable_hint":           "只有列表中的 CPAMP API 密钥可以调用 CommandCode 模型；明文密钥不会显示或保存。来源：CPAMP 认证配置的 api-keys。",
-		"callable_add":            "添加",
-		"callable_label":          "备注（可选）",
-		"callable_empty":          "尚未添加可调用密钥：当前不限制调用。",
-		"callable_not_in_source":  "该密钥不在 CPAMP 认证配置的 api-keys 列表中。",
-		"callable_source_error":   "无法读取 CPAMP 配置的 api-keys。",
-		"callable_allowed":        "允许调用",
-		"callable_not_allowed":    "未启用",
-		"callable_stale":          "来源已移除",
-		"callable_missing":        "该可调用密钥不存在。",
-		"callable_remove_confirm": "删除后该密钥将无法调用 CommandCode 模型。确认继续？",
-		"saved":                   "已保存",
-		"failed":                  "操作失败",
+		"title":            "CommandCode 账号",
+		"subtitle":         "账号与 CPA 凭据同一份数据：这里做的改动，CPAMP 凭证管理同样可见。",
+		"add":              "新增账号",
+		"add_title":        "新增 CommandCode 账号",
+		"edit_title":       "编辑 CommandCode 账号",
+		"cancel":           "取消",
+		"api_key":          "CommandCode API Key（user_ 开头）",
+		"api_key_keep":     "留空表示不修改当前 Key",
+		"label":            "显示名（可选）",
+		"base_url":         "上游地址（可选，默认官方）",
+		"save":             "保存",
+		"save_hint":        "同一 Key 重复保存不会产生第二条账号。",
+		"list":             "账号列表",
+		"refresh":          "刷新",
+		"empty":            "还没有账号。点击「新增账号」添加，或在 CPAMP 凭证管理中导入。",
+		"loading":          "加载中…",
+		"cooldown":         "冷却至",
+		"enable":           "启用",
+		"disable":          "停用",
+		"edit":             "编辑",
+		"remove":           "移出",
+		"restore":          "恢复",
+		"purge":            "彻底删除",
+		"removed":          "已移出（可恢复）",
+		"write_off":        "插件页写入已关闭（allow-page-write=false），当前为只读。",
+		"key_required":     "请输入 API Key。",
+		"key_prefix":       "API Key 必须以 user_ 开头。",
+		"base_url_invalid": "上游地址必须以 http:// 或 https:// 开头。",
+		"file_required":    "缺少文件参数。",
+		"dir_unknown":      "无法定位凭据目录（请先导入一个账号或在 CPAMP 中导入）。",
+		"write_disabled":   "插件页写入已关闭。",
+		"remove_note":      "已移出，宿主重载后完成注销；可用「恢复」找回。",
+		"purge_confirm":    "彻底删除后无法恢复，确认继续？",
+		"remove_confirm":   "移出后该账号不再参与请求，可用「恢复」找回。确认继续？",
+		"panel_hint":       "删除/排序等操作也可以直接在 CPAMP 凭证管理里完成。",
+		"security":         "安全提示：该页面不经过管理密钥认证，只应在本机或受信网络访问；API Key 不会写入 URL 与日志。",
+		"quota":            "额度",
+		"quota_title":      "额度与用量",
+		"close":            "关闭",
+		"plan":             "套餐",
+		"period_ends":      "账期截止",
+		"monthly":          "月额度",
+		"window_5h":        "5 小时窗口",
+		"window_weekly":    "每周窗口",
+		"reset_at":         "重置于",
+		"quota_limit":      "月额度上限",
+		"quota_used":       "本月已用",
+		"quota_remaining":  "剩余",
+		"quota_purchased":  "已购",
+		"quota_free":       "赠送",
+		"quota_empty":      "上游未返回额度数据。",
+		"exhausted":        "已用尽",
+		"usage_requests":   "请求",
+		"usage_failed":     "失败",
+		"usage_success":    "成功率",
+		"usage_spend":      "花费",
+		"usage_tokens":     "Token",
+		"tokens_in":        "入",
+		"tokens_out":       "出",
+		"saved":            "已保存",
+		"failed":           "操作失败",
 	},
 	"en": {
-		"title":                   "CommandCode Accounts",
-		"subtitle":                "These accounts are the CPA credentials themselves: changes here are visible in CPAMP credential management.",
-		"add":                     "Add account",
-		"add_title":               "Add a CommandCode account",
-		"edit_title":              "Edit CommandCode account",
-		"cancel":                  "Cancel",
-		"api_key":                 "CommandCode API key (starts with user_)",
-		"api_key_keep":            "Leave empty to keep the current key",
-		"label":                   "Display name (optional)",
-		"base_url":                "Upstream base URL (optional)",
-		"save":                    "Save",
-		"save_hint":               "Saving the same key again never creates a second account.",
-		"list":                    "Accounts",
-		"refresh":                 "Refresh",
-		"empty":                   "No accounts yet. Use \"Add account\", or import one in CPAMP credential management.",
-		"loading":                 "Loading…",
-		"cooldown":                "Cooling down until",
-		"enable":                  "Enable",
-		"disable":                 "Disable",
-		"edit":                    "Edit",
-		"remove":                  "Remove",
-		"restore":                 "Restore",
-		"purge":                   "Delete permanently",
-		"removed":                 "Removed (recoverable)",
-		"write_off":               "Page writes are disabled (allow-page-write=false); this page is read-only.",
-		"key_required":            "Enter an API key.",
-		"key_prefix":              "The API key must start with user_.",
-		"base_url_invalid":        "The base URL must start with http:// or https://.",
-		"file_required":           "Missing file parameter.",
-		"dir_unknown":             "Cannot locate the credential directory (import an account first).",
-		"write_disabled":          "Page writes are disabled.",
-		"remove_note":             "Removed; the host finishes unregistering after a reload. Use Restore to get it back.",
-		"purge_confirm":           "Deleting permanently cannot be undone. Continue?",
-		"remove_confirm":          "The account stops serving requests after removal. Continue?",
-		"panel_hint":              "Delete and ordering are also available in CPAMP credential management.",
-		"security":                "Security: this page is not authenticated by the management key; keep it on localhost or a trusted network. API keys never enter URLs or logs.",
-		"quota":                   "Quota",
-		"quota_title":             "Quota & usage",
-		"close":                   "Close",
-		"plan":                    "Plan",
-		"period_ends":             "Period ends",
-		"monthly":                 "Monthly",
-		"window_5h":               "5-hour window",
-		"window_weekly":           "Weekly window",
-		"reset_at":                "Resets at",
-		"quota_limit":             "Monthly limit",
-		"quota_used":              "Monthly used",
-		"quota_remaining":         "Remaining",
-		"quota_purchased":         "Purchased",
-		"quota_free":              "Free",
-		"quota_empty":             "Upstream returned no quota data.",
-		"exhausted":               "Exhausted",
-		"usage_requests":          "Requests",
-		"usage_failed":            "failed",
-		"usage_success":           "Success rate",
-		"usage_spend":             "Spend",
-		"usage_tokens":            "Tokens",
-		"tokens_in":               "in",
-		"tokens_out":              "out",
-		"callable_title":          "Callable keys",
-		"callable_hint":           "Only the CPAMP API keys listed here may call CommandCode models. Plaintext keys are never shown or stored. Source: the api-keys list in CPAMP auth config.",
-		"callable_add":            "Add",
-		"callable_label":          "Label (optional)",
-		"callable_empty":          "No callable keys yet: calling is currently unrestricted.",
-		"callable_not_in_source":  "This key is not in the CPAMP auth api-keys list.",
-		"callable_source_error":   "Cannot read the CPAMP api-keys configuration.",
-		"callable_allowed":        "Allowed",
-		"callable_not_allowed":    "Not enabled",
-		"callable_stale":          "Removed from source",
-		"callable_missing":        "That callable key does not exist.",
-		"callable_remove_confirm": "After deletion this key can no longer call CommandCode models. Continue?",
-		"saved":                   "Saved",
-		"failed":                  "The action failed",
+		"title":            "CommandCode Accounts",
+		"subtitle":         "These accounts are the CPA credentials themselves: changes here are visible in CPAMP credential management.",
+		"add":              "Add account",
+		"add_title":        "Add a CommandCode account",
+		"edit_title":       "Edit CommandCode account",
+		"cancel":           "Cancel",
+		"api_key":          "CommandCode API key (starts with user_)",
+		"api_key_keep":     "Leave empty to keep the current key",
+		"label":            "Display name (optional)",
+		"base_url":         "Upstream base URL (optional)",
+		"save":             "Save",
+		"save_hint":        "Saving the same key again never creates a second account.",
+		"list":             "Accounts",
+		"refresh":          "Refresh",
+		"empty":            "No accounts yet. Use \"Add account\", or import one in CPAMP credential management.",
+		"loading":          "Loading…",
+		"cooldown":         "Cooling down until",
+		"enable":           "Enable",
+		"disable":          "Disable",
+		"edit":             "Edit",
+		"remove":           "Remove",
+		"restore":          "Restore",
+		"purge":            "Delete permanently",
+		"removed":          "Removed (recoverable)",
+		"write_off":        "Page writes are disabled (allow-page-write=false); this page is read-only.",
+		"key_required":     "Enter an API key.",
+		"key_prefix":       "The API key must start with user_.",
+		"base_url_invalid": "The base URL must start with http:// or https://.",
+		"file_required":    "Missing file parameter.",
+		"dir_unknown":      "Cannot locate the credential directory (import an account first).",
+		"write_disabled":   "Page writes are disabled.",
+		"remove_note":      "Removed; the host finishes unregistering after a reload. Use Restore to get it back.",
+		"purge_confirm":    "Deleting permanently cannot be undone. Continue?",
+		"remove_confirm":   "The account stops serving requests after removal. Continue?",
+		"panel_hint":       "Delete and ordering are also available in CPAMP credential management.",
+		"security":         "Security: this page is not authenticated by the management key; keep it on localhost or a trusted network. API keys never enter URLs or logs.",
+		"quota":            "Quota",
+		"quota_title":      "Quota & usage",
+		"close":            "Close",
+		"plan":             "Plan",
+		"period_ends":      "Period ends",
+		"monthly":          "Monthly",
+		"window_5h":        "5-hour window",
+		"window_weekly":    "Weekly window",
+		"reset_at":         "Resets at",
+		"quota_limit":      "Monthly limit",
+		"quota_used":       "Monthly used",
+		"quota_remaining":  "Remaining",
+		"quota_purchased":  "Purchased",
+		"quota_free":       "Free",
+		"quota_empty":      "Upstream returned no quota data.",
+		"exhausted":        "Exhausted",
+		"usage_requests":   "Requests",
+		"usage_failed":     "failed",
+		"usage_success":    "Success rate",
+		"usage_spend":      "Spend",
+		"usage_tokens":     "Tokens",
+		"tokens_in":        "in",
+		"tokens_out":       "out",
+		"saved":            "Saved",
+		"failed":           "The action failed",
 	},
 }
 
@@ -227,17 +203,6 @@ func AccountsPageHTML(lang string) string {
 	b.WriteString("  <div id=\"state\" class=\"state\">")
 	b.WriteString(t("loading"))
 	b.WriteString("</div>\n  <div id=\"accounts\" class=\"accounts\"></div>\n</section>\n")
-
-	// Callable keys: only the keys listed here may reach the CommandCode models.
-	b.WriteString("<section class=\"card\">\n  <div class=\"section-head\"><h2>")
-	b.WriteString(t("callable_title"))
-	b.WriteString("</h2><span class=\"muted small\" id=\"callableState\"></span></div>\n  <p class=\"muted small\">")
-	b.WriteString(t("callable_hint"))
-	b.WriteString("</p>\n  <div class=\"callable-add\">\n    <input id=\"callableKey\" type=\"password\" autocomplete=\"off\" spellcheck=\"false\" placeholder=\"sk-...\">\n    <input id=\"callableLabel\" type=\"text\" autocomplete=\"off\" placeholder=\"")
-	b.WriteString(t("callable_label"))
-	b.WriteString("\">\n    <button class=\"btn primary\" id=\"callableAdd\">")
-	b.WriteString(t("callable_add"))
-	b.WriteString("</button>\n  </div>\n  <div id=\"callableList\" class=\"accounts\"></div>\n</section>\n")
 
 	// Footer notes.
 	b.WriteString("<section class=\"card\">\n  <p class=\"muted small\">")
@@ -394,8 +359,6 @@ input:focus { outline: 2px solid color-mix(in srgb, var(--primary-color, #409eff
 }
 .tile-label { margin-bottom: 2px; }
 .tile-value { font-weight: 600; font-size: 16px; word-break: break-all; }
-.callable-add { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.callable-add input { max-width: 320px; }
 `
 
 // pageScriptLiteral renders the localized strings embedded into the page. Every
@@ -416,9 +379,6 @@ func pageScriptLiteral(lang string) string {
 		"window_weekly", "reset_at", "quota_limit", "quota_used", "quota_remaining",
 		"quota_purchased", "quota_free", "quota_empty", "exhausted", "usage_requests",
 		"usage_failed", "usage_success", "usage_spend", "usage_tokens", "tokens_in", "tokens_out",
-		"callable_title", "callable_hint", "callable_add", "callable_label", "callable_empty",
-		"callable_not_in_source", "callable_source_error", "callable_allowed", "callable_not_allowed",
-		"callable_stale", "callable_missing", "callable_remove_confirm",
 	}
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -447,10 +407,6 @@ const pageRuntime = `
   var quotaOverlay = document.getElementById('quotaOverlay');
   var quotaTitle = document.getElementById('quotaTitle');
   var quotaBody = document.getElementById('quotaBody');
-  var callableList = document.getElementById('callableList');
-  var callableState = document.getElementById('callableState');
-  var callableKeyInput = document.getElementById('callableKey');
-  var callableLabelInput = document.getElementById('callableLabel');
 
   function toast(text) {
     if (!text) return;
@@ -648,73 +604,6 @@ const pageRuntime = `
     });
   }
 
-  function loadCallableKeys() {
-    return call('keys').then(function (result) {
-      callableList.innerHTML = '';
-      callableState.textContent = '';
-      if (!result || result.ok === false) {
-        callableState.textContent = (result && result.error) || S.failed;
-        return result;
-      }
-      var payload = result.data || {};
-      if (payload.source_error) callableState.textContent = S.callable_source_error;
-      var keys = payload.keys || [];
-      if (!keys.length) {
-        callableList.appendChild(element('p', 'muted small', S.callable_empty || ''));
-        return result;
-      }
-      keys.forEach(function (entry) {
-        var row = document.createElement('div');
-        row.className = 'account' + (entry.stale || entry.disabled ? ' off' : '');
-        var info = document.createElement('div');
-        var name = document.createElement('div');
-        name.className = 'name';
-        name.appendChild(element('span', '', entry.masked || entry.id));
-        var pillText = entry.stale ? S.callable_stale : (entry.allowed && !entry.disabled ? S.callable_allowed : S.callable_not_allowed);
-        name.appendChild(element('span', 'pill ' + (entry.allowed && !entry.disabled && !entry.stale ? 'ok' : 'grey'), pillText));
-        info.appendChild(name);
-        if (entry.label) info.appendChild(element('div', 'meta', entry.label));
-        row.appendChild(info);
-
-        var actions = document.createElement('div');
-        actions.className = 'row-actions';
-        function button(text, className, handler) {
-          var btn = document.createElement('button');
-          btn.className = 'btn ' + (className || '');
-          btn.textContent = text;
-          btn.disabled = !writeEnabled;
-          btn.addEventListener('click', function () {
-            btn.disabled = true;
-            Promise.resolve(handler()).then(function (res) {
-              if (res && res.ok === false) toast(res.error || S.failed);
-              return loadCallableKeys();
-            }).finally(function () { btn.disabled = !writeEnabled; });
-          });
-          return btn;
-        }
-        if (entry.stale) {
-          actions.appendChild(button(S.purge, 'danger', function () {
-            if (!window.confirm(S.callable_remove_confirm)) return Promise.resolve(null);
-            return call('key_delete', { id: entry.id });
-          }));
-        } else if (entry.allowed) {
-          actions.appendChild(button(entry.disabled ? S.enable : S.disable, '', function () {
-            return call('key_update', { id: entry.id, disabled: entry.disabled ? '0' : '1', label: entry.label || '' });
-          }));
-          actions.appendChild(button(S.remove, 'danger', function () {
-            if (!window.confirm(S.callable_remove_confirm)) return Promise.resolve(null);
-            return call('key_delete', { id: entry.id });
-          }));
-        } else {
-          actions.appendChild(element('span', 'muted small', S.callable_not_allowed));
-        }
-        row.appendChild(actions);
-        callableList.appendChild(row);
-      });
-      return result;
-    });
-  }
-
   function openModal(account) {
     if (!writeEnabled) { toast(S.write_disabled || S.failed); return; }
     editingFile = account ? account.file : '';
@@ -843,24 +732,11 @@ const pageRuntime = `
         accounts.forEach(function (account) { list.appendChild(renderRow(account)); });
         renderWindows();
       }
-      loadCallableKeys();
       return result;
     });
   }
 
   document.getElementById('refresh').addEventListener('click', function () { load(); });
-  document.getElementById('callableAdd').addEventListener('click', function () {
-    var key = callableKeyInput.value.trim();
-    if (!key) { toast(S.key_required); return; }
-    var headers = { 'X-CommandCode-Callable-Key': key };
-    call('key_add', { label: callableLabelInput.value.trim() }, { headers: headers }).then(function (result) {
-      if (result && result.ok === false) { toast(result.error || S.failed); return; }
-      callableKeyInput.value = '';
-      callableLabelInput.value = '';
-      toast(S.saved || 'saved');
-      loadCallableKeys();
-    });
-  });
   document.getElementById('addAccount').addEventListener('click', function () { openModal(null); });
   document.getElementById('modalCancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', function (event) { if (event.target === overlay) closeModal(); });

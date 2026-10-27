@@ -2171,6 +2171,8 @@ Phase 5 的最终报告需要可复现的验证证据。
 | `README.md` | Modify | 账号卡内联窗口说明、新增“可调用密钥”章节、职责边界表补充 |
 
 > 计划中提及但**未修改**（Step 2 未执行，见 `## 6. Plan Adjustment`）：`provider.go`、`config.go`、`stream.go`、`config_test.go`。
+>
+> **2026-10-07 后续：用户要求移除“可调用密钥”功能，Step 6-10 的相关交付已回退**，`callable.go` / `callable_test.go` 移入 `backups/removed-callable-keys-20261007/`；窗口内联（Step 3-5、9 的窗口部分）保留。详见 `## 6. Plan Adjustment` 的 Plan Adjustment 3。
 
 ## 5. Verification Checklist
 
@@ -2206,6 +2208,17 @@ Phase 5 的最终报告需要可复现的验证证据。
 - [ ] 部署冒烟（非本地完成条件）：CPAMP 页面渲染、真实窗口数据、真实调用方准入、需求 1 诊断证据与选项选择。
 
 ## 6. Plan Adjustment
+
+### Plan Adjustment 3（2026-10-07，用户要求：移除“可调用密钥”功能）
+
+- 原计划：Step 6-10 交付“可调用密钥”来源读取、存储、准入与页面 CRUD，并在 Step 7/9 接入执行器与页面。
+- 新需求：用户明确要求去掉该功能，保留账号卡内联 5H/每周窗口。
+- 调整内容（均在工作区，未提交）：
+  - 移除：`internal/commandcode/callable.go`、`internal/commandcode/callable_test.go`（移入 `backups/removed-callable-keys-20261007/`，非永久删除）。
+  - 回退：`executor.go` 的 `allowCaller` 调用；`management.go` 的 `keys/key_add/key_update/key_delete` 分支、`callableKeyCandidateView` 与 4 个 handler；`page.go` 的可调用密钥 HTML/CSS/文案/`loadCallableKeys`/事件绑定；`management_test.go` 的 `TestAccountsPageHasCallableKeys`；README 的“可调用密钥”章节与职责行。
+  - 保留：`windows` 批量路由与卡片内联窗口、`stream_test.go`、Step 1 的调查结论。
+- 新增修改范围：无（全部为回退既有改动）。
+- 影响：可调用密钥相关测试与断言随之移除；`go test ./internal/...` 仍须全绿。
 
 ### Plan Adjustment 1（已执行，未扩大范围）
 

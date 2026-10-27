@@ -66,15 +66,6 @@ plugins:
 
 CPAMP 凭证管理侧：插件注册了 CPA 的 **quota provider**，凭证列表会带 `supports_quota=true`，面板可按凭据查询同一份额度（与 Codex 额度同一机制）；`quota.reset` 明确返回不支持（窗口由上游滚动重置）。
 
-## 可调用密钥
-
-插件页的「可调用密钥 / Callable keys」区块限制哪些 CPA 客户端密钥可以调用 CommandCode 模型：
-
-- **来源**：CPAMP 认证配置的 `api-keys`（即 CPA `config.yaml` 的 `api-keys` / `access.api-keys`）。页面列出这些 key（只显示掩码），并可查看哪些已被允许调用。
-- **启用方式**：把明文 key 粘贴到输入框添加（明文不落盘：插件只保存 `caller_scope` 哈希与掩码）；也可停用、改备注、删除。
-- **执行效果**：请求在插件执行器入口按宿主下发的 `caller_scope` 匹配；未命中或缺失且列表非空时返回 HTTP 403，不会在账号间冷却/换号。列表为空时**不限制**（向后兼容；页面会明确提示）。
-- **前提**：CPA 需要启用客户端认证（`api-keys`）。如果插件读不到 CPA 的配置文件（例如配置来自远程/Home 模式），页面会提示来源不可用并禁止新增，运行时不受影响。
-
 ## 配置
 
 `plugins.configs.commandcode`（面板保存即生效，无需重启）：
@@ -85,7 +76,7 @@ CPAMP 凭证管理侧：插件注册了 CPA 的 **quota provider**，凭证列�
 | `fingerprint-salt` | 空 | 设备指纹盐：改它 = 全部账号换一台设备 |
 | `project-dir` | `C:\Users\dev\projects\app` | 伪装的项目目录（与指纹同源自洽） |
 | `cli-mode` | `agent` | 信封 `mode`（agent / learning / custom-agent / …） |
-| `cli-version` | `1.53.1` | `x-command-code-version` 上报值 |
+| `cli-version` | `1.88.0` | `x-command-code-version` 上报值 |
 | `lifecycle-mode` | `interactive` | lifecycle 元数据 `mode` |
 | `zdr` | `false` | 请求上游 ZDR-only 路由 |
 | `model-cache-ttl` | `5m` | 每凭据模型目录缓存 |
@@ -116,7 +107,6 @@ CPAMP 凭证管理侧：插件注册了 CPA 的 **quota provider**，凭证列�
 | 用量统计与请求监控 | CPA 解析执行器响应 → CPAMP |
 | CommandCode 上游协议、设备指纹、模型目录、错误分级、账号页 | 本插件 |
 | CommandCode 凭据额度（读取、归一化；插件页展示 + CPAMP 凭证管理查询） | 本插件（CPA quota provider） |
-| 可调用密钥子集（在 CPAMP `api-keys` 范围内按 `caller_scope` 限流本插件模型） | 本插件 |
 
 插件**不做**跨账号轮换（否则会与 CPA 的轮换叠加，历史上曾把 1 次请求放大成 30 次上游调用）。
 

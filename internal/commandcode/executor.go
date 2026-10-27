@@ -79,7 +79,27 @@ func prepareExecutor(req *pluginapi.ExecutorRequest, cfg RuntimeConfig) (Account
 	if errBuild != nil {
 		return Account{}, DeviceProfile{}, nil, errBuild
 	}
+	if errSize := checkEnvelopeSize(envelope, cfg.MaxBodyMB); errSize != nil {
+		return Account{}, DeviceProfile{}, nil, errSize
+	}
 	return account, profile, envelope, nil
+}
+
+// checkEnvelopeSize enforces the configured upstream request-body ceiling before
+// any pre-request or generation call. It is request-scoped: another credential
+// cannot make the same body smaller.
+func checkEnvelopeSize(envelope []byte, maxMB int) error {
+	if maxMB <= 0 {
+		return nil
+	}
+	limit := int64(maxMB) * 1024 * 1024
+	if int64(len(envelope)) <= limit {
+		return nil
+	}
+	return &downstreamError{
+		status:  http.StatusBadRequest,
+		message: fmt.Sprintf("request body is %d bytes, limit is %d bytes", len(envelope), limit),
+	}
 }
 
 // initialize runs the fingerprint/lifecycle pre-requests. Failures are logged
@@ -214,7 +234,6 @@ func handleExecuteStream(request []byte) ([]byte, error) {
 		if !translator.sawContent && translator.usage.OutputTokens == 0 {
 			return nil, &zeroOutputError{message: "upstream produced no output; reduce context or retry"}
 		}
-		chunks = append(chunks, pluginapi.ExecutorStreamChunk{Payload: []byte("data: [DONE]\n\n")})
 		return okEnvelope(map[string]any{"headers": http.Header{}, "chunks": chunks}), nil
 	}
 
@@ -229,7 +248,7 @@ func handleExecuteStream(request []byte) ([]byte, error) {
 		defer cancel()
 		defer func() { _ = resp.Body.Close() }()
 		errStream := translator.consumeUpstream(resp.Body, cfg.StreamIdleTimeout, func(chunk []byte) bool {
-			return EmitStream(streamID, append(chunk, '\n', '\n')) == nil
+			return EmitStream(streamID, chunk) == nil
 		})
 		switch {
 		case errors.Is(errStream, errClientGone):
@@ -242,8 +261,6 @@ func handleExecuteStream(request []byte) ([]byte, error) {
 				EmitStreamError(streamID, toDownstreamError(translator.upstreamErr).Error())
 			} else if !translator.sawContent && translator.usage.OutputTokens == 0 {
 				EmitStreamError(streamID, "upstream produced no output; reduce context or retry")
-			} else {
-				_ = EmitStream(streamID, []byte("data: [DONE]\n\n"))
 			}
 		}
 		CloseStream(streamID)

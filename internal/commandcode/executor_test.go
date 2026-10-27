@@ -1,6 +1,7 @@
 package commandcode
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -332,14 +333,14 @@ func TestHandleExecuteStreamEmitsChunks(t *testing.T) {
 		deadline++
 	}
 	emits := host.records("host.stream.emit")
-	if len(emits) < 3 {
+	if len(emits) != 3 {
 		host.mu.Lock()
 		methods := []string{}
 		for _, record := range host.calls {
 			methods = append(methods, record.Method)
 		}
 		host.mu.Unlock()
-		t.Fatalf("stream emits = %d, want the two deltas plus [DONE]; host calls: %v", len(emits), methods)
+		t.Fatalf("stream emits = %d, want the three data chunks and no plugin terminator; host calls: %v", len(emits), methods)
 	}
 	first := emits[0].Request
 	if first["stream_id"] != "stream-1" {
@@ -349,9 +350,12 @@ func TestHandleExecuteStreamEmitsChunks(t *testing.T) {
 	joined := ""
 	for _, emit := range emits {
 		encoded, _ := emit.Request["payload"].(string)
-		if decoded, err := base64.StdEncoding.DecodeString(encoded); err == nil {
-			joined += string(decoded)
+		decoded, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			t.Fatalf("payload decode: %v", err)
 		}
+		assertCPAExecutorPayload(t, decoded)
+		joined += string(decoded)
 	}
 	if !strings.Contains(joined, "Hel") || !strings.Contains(joined, "lo") {
 		t.Errorf("emitted chunks = %q, want both deltas", joined)
@@ -359,11 +363,74 @@ func TestHandleExecuteStreamEmitsChunks(t *testing.T) {
 	if !strings.Contains(joined, "chat.completion.chunk") {
 		t.Errorf("emitted chunks are not OpenAI chunks: %q", joined)
 	}
-	if !strings.Contains(joined, "[DONE]") {
-		t.Errorf("emitted chunks are missing the terminator: %q", joined)
+	if strings.Contains(joined, "[DONE]") {
+		t.Errorf("plugin emitted its own terminator; CPA owns [DONE]: %q", joined)
 	}
 	if len(host.records("host.stream.close")) != 1 {
 		t.Errorf("stream close calls = %d, want 1", len(host.records("host.stream.close")))
+	}
+}
+
+func TestHandleExecuteStreamAcceptsRepeatedDataDoneMarker(t *testing.T) {
+	host := &stubHost{}
+	host.install(t)
+
+	server := upstreamStreamServer(t, []string{
+		`{"type":"text-delta","text":"ok"}`,
+		`{"type":"finish","finishReason":"stop","totalUsage":{"inputTokens":1,"outputTokens":1}}`,
+		`data: data: [DONE]`,
+	}, nil)
+	defer server.Close()
+
+	raw, err := json.Marshal(map[string]any{
+		"AuthID":       "commandcode-abc.json",
+		"AuthProvider": ProviderID,
+		"Model":        "deepseek/deepseek-v4-flash",
+		"Payload":      []byte(`{"model":"deepseek/deepseek-v4-flash","messages":[{"role":"user","content":"hi"}]}`),
+		"StorageJSON":  []byte(`{"type":"commandcode","api_key":"user_test1234567890","base_url":"` + server.URL + `"}`),
+		"Headers":      http.Header{},
+		"stream_id":    "stream-1",
+	})
+	if err != nil {
+		t.Fatalf("marshal stream request: %v", err)
+	}
+	if _, err := handleExecuteStream(raw); err != nil {
+		t.Fatalf("handleExecuteStream() error = %v", err)
+	}
+
+	deadline := 0
+	for len(host.records("host.stream.close")) == 0 && deadline < 200 {
+		sleepMillis(10)
+		deadline++
+	}
+	for _, emit := range host.records("host.stream.emit") {
+		encoded, _ := emit.Request["payload"].(string)
+		decoded, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			t.Fatalf("payload decode: %v", err)
+		}
+		assertCPAExecutorPayload(t, decoded)
+	}
+	if len(host.records("host.stream.close")) != 1 {
+		t.Fatal("malformed terminator must still close the stream exactly once")
+	}
+}
+
+// assertCPAExecutorPayload pins the executor-to-CPA contract for the OpenAI
+// chat-completions path: CPA wraps each payload as "data: %s\n\n" and writes the
+// single [DONE] itself. The plugin must send neither a frame prefix nor a
+// terminator.
+func assertCPAExecutorPayload(t *testing.T, payload []byte) {
+	t.Helper()
+	trimmed := bytes.TrimSpace(payload)
+	if bytes.HasPrefix(trimmed, []byte("data:")) {
+		t.Fatalf("executor payload must be bare JSON, got %q", payload)
+	}
+	if bytes.Equal(trimmed, []byte("[DONE]")) {
+		t.Fatal("executor must not emit [DONE]; CPA owns the terminator")
+	}
+	if !json.Valid(trimmed) {
+		t.Fatalf("payload is not valid JSON: %q", payload)
 	}
 }
 
@@ -473,4 +540,98 @@ func statusOf(err error) int {
 
 func sleepMillis(ms int) {
 	time.Sleep(time.Duration(ms) * time.Millisecond)
+}
+
+func TestHandleExecuteStreamInlineReturnsOnlyDataChunks(t *testing.T) {
+	host := &stubHost{}
+	host.install(t)
+
+	server := upstreamStreamServer(t, []string{
+		`{"type":"text-delta","text":"one"}`,
+		`{"type":"text-delta","text":"two"}`,
+		`{"type":"finish","finishReason":"stop","totalUsage":{"inputTokens":2,"outputTokens":2}}`,
+		`data: data: [DONE]`,
+	}, nil)
+	defer server.Close()
+
+	raw, err := json.Marshal(map[string]any{
+		"AuthID":       "commandcode-abc.json",
+		"AuthProvider": ProviderID,
+		"Model":        "deepseek/deepseek-v4-flash",
+		"Payload":      []byte(`{"model":"deepseek/deepseek-v4-flash","messages":[{"role":"user","content":"hi"}]}`),
+		"StorageJSON":  []byte(`{"type":"commandcode","api_key":"user_test1234567890","base_url":"` + server.URL + `"}`),
+		"Headers":      http.Header{},
+	})
+	if err != nil {
+		t.Fatalf("marshal stream request: %v", err)
+	}
+
+	frame, err := handleExecuteStream(raw)
+	if err != nil {
+		t.Fatalf("handleExecuteStream() error = %v", err)
+	}
+	var envelope struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			Chunks []struct {
+				Payload []byte `json:"Payload"`
+			} `json:"chunks"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(frame, &envelope); err != nil {
+		t.Fatalf("frame is not valid JSON: %v", err)
+	}
+	if !envelope.OK {
+		t.Fatalf("inline stream failed: %s", frame)
+	}
+	if len(envelope.Result.Chunks) != 3 {
+		t.Fatalf("chunks = %d, want three bare data chunks and no terminator", len(envelope.Result.Chunks))
+	}
+	for _, chunk := range envelope.Result.Chunks {
+		assertCPAExecutorPayload(t, chunk.Payload)
+	}
+}
+
+func TestHandleExecuteRejectsOversizedEnvelopeBeforeUpstream(t *testing.T) {
+	host := &stubHost{}
+	host.install(t)
+	restoreDefaults(t)
+
+	var generateCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == EndpointGenerate {
+			generateCalls++
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	ApplyConfigYAML([]byte("max-body-mb: 1\n"))
+	large := strings.Repeat("x", 1<<20)
+	payload := `{"model":"m","messages":[{"role":"user","content":"` + large + `"}]}`
+	raw := executorRequest(t, server.URL, payload, nil, nil)
+	_, err := handleExecute(raw)
+	if err == nil {
+		t.Fatal("oversized request returned success, want a request-level failure")
+	}
+	if got := statusOf(err); got != http.StatusBadRequest {
+		t.Errorf("StatusCode() = %d, want 400 so CPA never rotates credentials", got)
+	}
+	if generateCalls != 0 {
+		t.Errorf("generate calls = %d, want 0 before the body limit rejects the request", generateCalls)
+	}
+}
+
+func TestCheckEnvelopeSizeBoundary(t *testing.T) {
+	const limit = 1 << 20
+	if err := checkEnvelopeSize(make([]byte, limit), 1); err != nil {
+		t.Fatalf("exact limit rejected: %v", err)
+	}
+	err := checkEnvelopeSize(make([]byte, limit+1), 1)
+	if err == nil || statusOf(err) != http.StatusBadRequest {
+		t.Fatalf("over-limit error = %v, want request-scoped 400", err)
+	}
+	if err := checkEnvelopeSize(make([]byte, limit*2), 0); err != nil {
+		t.Fatalf("max-body-mb=0 must disable the limit: %v", err)
+	}
 }

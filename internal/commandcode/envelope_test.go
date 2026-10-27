@@ -82,8 +82,9 @@ func TestBuildEnvelopeStaticFields(t *testing.T) {
 	if config["workingDir"] != DefaultProjectDir {
 		t.Errorf("config.workingDir = %v, want the faked project dir", config["workingDir"])
 	}
-	if config["environment"] != DefaultPlatform {
-		t.Errorf("config.environment = %v, want %q", config["environment"], DefaultPlatform)
+	environment, _ := config["environment"].(string)
+	if !strings.Contains(environment, DefaultPlatform+"-"+DefaultArch) || !strings.Contains(environment, "Node.js ") {
+		t.Errorf("config.environment = %q, want the CLI platform/arch/Node.js shape", environment)
 	}
 
 	params, _ := body["params"].(map[string]any)
@@ -95,6 +96,9 @@ func TestBuildEnvelopeStaticFields(t *testing.T) {
 	}
 	if params["max_tokens"].(float64) != 64000 {
 		t.Errorf("params.max_tokens = %v, want the 64000 default", params["max_tokens"])
+	}
+	if params["temperature"].(float64) != 0.3 {
+		t.Errorf("params.temperature = %v, want the CLI default 0.3", params["temperature"])
 	}
 	tools, ok := params["tools"].([]any)
 	if !ok || len(tools) != 0 {
@@ -191,8 +195,8 @@ func TestBuildEnvelopeToolsAndChoice(t *testing.T) {
 	if first["name"] != "shell_output" {
 		t.Errorf("tool name = %v, want the CLI alias shell_output", first["name"])
 	}
-	if _, exists := first["type"]; exists {
-		t.Error("wire tools must not carry a type field")
+	if first["type"] != "function" {
+		t.Errorf("tool type = %v, want function", first["type"])
 	}
 	if first["input_schema"] == nil {
 		t.Error("wire tools must carry input_schema")
@@ -381,5 +385,19 @@ func TestBuildEnvelopeRejectsInvalidJSON(t *testing.T) {
 	profile := DeriveDevice("user_env", "", cfg.ProjectDir, cfg.MasqueradePlatform, cfg.MasqueradeArch)
 	if _, err := BuildEnvelope([]byte("{not json"), "", profile, cfg); err == nil {
 		t.Fatal("BuildEnvelope(invalid json) = nil error, want a failure")
+	}
+}
+
+func TestBuildEnvelopeRespectsExplicitTemperature(t *testing.T) {
+	cfg := DefaultConfig()
+	body := buildTestEnvelope(t, `{"model":"m","temperature":0,"messages":[{"role":"user","content":"hi"}]}`, "", cfg)
+	params, _ := body["params"].(map[string]any)
+	if params["temperature"].(float64) != 0 {
+		t.Errorf("temperature = %v, want explicit zero preserved", params["temperature"])
+	}
+	body = buildTestEnvelope(t, `{"model":"m","temperature":0.7,"messages":[{"role":"user","content":"hi"}]}`, "", cfg)
+	params, _ = body["params"].(map[string]any)
+	if params["temperature"].(float64) != 0.7 {
+		t.Errorf("temperature = %v, want explicit 0.7 preserved", params["temperature"])
 	}
 }

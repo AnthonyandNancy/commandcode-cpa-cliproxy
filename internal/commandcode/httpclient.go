@@ -50,6 +50,7 @@ func proxyFunc(proxyURL string) func(*http.Request) (*url.URL, error) {
 func upstreamHeaders(account Account, profile DeviceProfile, cfg RuntimeConfig, sessionID string, preflight bool) map[string]string {
 	headers := map[string]string{
 		"Content-Type":           "application/json",
+		"accept-encoding":        "identity",
 		"Authorization":          "Bearer " + account.APIKey,
 		"x-command-code-version": cfg.CLIVersion,
 		"x-cli-environment":      "production",
@@ -59,6 +60,7 @@ func upstreamHeaders(account Account, profile DeviceProfile, cfg RuntimeConfig, 
 		headers["User-Agent"] = "cli"
 		headers["x-project-slug"] = profile.ProjectSlug()
 		headers["x-taste-learning"] = "false"
+		headers["x-co-flag"] = "false"
 	}
 	if strings.TrimSpace(sessionID) != "" {
 		headers["x-session-id"] = sessionID

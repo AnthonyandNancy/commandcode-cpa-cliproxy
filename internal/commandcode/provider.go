@@ -44,9 +44,10 @@ const (
 const (
 	// DefaultBaseURL is the CommandCode API base.
 	DefaultBaseURL = "https://api.commandcode.ai"
-	// DefaultCLIVersion is the x-command-code-version header value. It mirrors
-	// the version commandcode-proxy pins (CC_PROTOCOL_VERSION).
-	DefaultCLIVersion = "1.53.1"
+	// DefaultCLIVersion is the x-command-code-version header value, synced to
+	// the Command Code CLI data-plane snapshot used by
+	// Mars-Sea/dsh-commandcode-provider. It is not the plugin or DSH version.
+	DefaultCLIVersion = "1.88.0"
 	// DefaultProjectDir is the faked working directory reported upstream.
 	DefaultProjectDir = `C:\Users\dev\projects\app`
 	// DefaultPlatform / DefaultArch keep the device profile self-consistent with

@@ -42,9 +42,21 @@ type envelopeSystemBlock struct {
 }
 
 type envelopeTool struct {
+	Type        string `json:"type"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	InputSchema any    `json:"input_schema"`
+}
+
+// cliNodeVersion is the Node.js version advertised inside the CLI environment
+// string. It is a stable emulated value, never the host's real runtime.
+const cliNodeVersion = "v22.0.0"
+
+// cliEnvironment renders the environment value used by the Command Code CLI.
+func cliEnvironment(profile DeviceProfile) string {
+	platform := firstNonEmpty(strings.TrimSpace(profile.Platform), DefaultPlatform)
+	arch := firstNonEmpty(strings.TrimSpace(profile.Arch), DefaultArch)
+	return fmt.Sprintf("%s-%s, Node.js %s", platform, arch, cliNodeVersion)
 }
 
 type envelopeParams struct {
@@ -135,6 +147,9 @@ func BuildEnvelope(payload []byte, sessionID string, profile DeviceProfile, cfg 
 	}
 	if temperature := floatPointer(root["temperature"]); temperature != nil {
 		params.Temperature = temperature
+	} else {
+		defaultTemperature := 0.3
+		params.Temperature = &defaultTemperature
 	}
 	if effort := strings.TrimSpace(stringValue(root["reasoning_effort"])); effort != "" {
 		params.ReasoningEffort = effort
@@ -150,7 +165,7 @@ func BuildEnvelope(payload []byte, sessionID string, profile DeviceProfile, cfg 
 		Config: envelopeConfig{
 			WorkingDir:    profile.ProjectDir,
 			Date:          todayUTC(),
-			Environment:   profile.Platform,
+			Environment:   cliEnvironment(profile),
 			Structure:     []any{},
 			IsGitRepo:     false,
 			CurrentBranch: "",
@@ -413,6 +428,7 @@ func toWireTools(raw any) []envelopeTool {
 			schema = map[string]any{"type": "object", "properties": map[string]any{}}
 		}
 		tools = append(tools, envelopeTool{
+			Type:        "function",
 			Name:        wireToolName(name),
 			Description: description,
 			InputSchema: schema,

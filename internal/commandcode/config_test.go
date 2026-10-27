@@ -35,6 +35,9 @@ func TestDefaultConfigMatchesReferenceDefaults(t *testing.T) {
 	if cfg.CLIVersion != DefaultCLIVersion {
 		t.Errorf("CLIVersion = %q, want %q", cfg.CLIVersion, DefaultCLIVersion)
 	}
+	if cfg.CLIVersion != "1.88.0" {
+		t.Errorf("CLIVersion = %q, want the synchronized 1.88.0", cfg.CLIVersion)
+	}
 	if !cfg.AllowPageWrite {
 		t.Error("AllowPageWrite must default to true")
 	}

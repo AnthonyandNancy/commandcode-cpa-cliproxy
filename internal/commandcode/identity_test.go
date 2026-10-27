@@ -268,8 +268,23 @@ func TestUpstreamHeaders(t *testing.T) {
 	if headers["User-Agent"] != "cli" {
 		t.Errorf("User-Agent = %q, want cli", headers["User-Agent"])
 	}
+	if headers["accept-encoding"] != "identity" {
+		t.Errorf("accept-encoding = %q, want identity", headers["accept-encoding"])
+	}
+	if headers["x-co-flag"] != "false" {
+		t.Errorf("x-co-flag = %q, want false", headers["x-co-flag"])
+	}
 	if headers["x-project-slug"] != profile.ProjectSlug() {
 		t.Errorf("x-project-slug = %q, want the slugified project dir", headers["x-project-slug"])
+	}
+	preflight := upstreamHeaders(account, profile, cfg, "", true)
+	if preflight["accept-encoding"] != "identity" {
+		t.Errorf("preflight accept-encoding = %q, want identity", preflight["accept-encoding"])
+	}
+	for _, name := range []string{"x-co-flag", "x-project-slug", "x-taste-learning"} {
+		if _, exists := preflight[name]; exists {
+			t.Errorf("preflight must not send %s", name)
+		}
 	}
 	if _, exists := headers["x-session-id"]; exists {
 		t.Error("no session identity was supplied, so no session header may be invented")

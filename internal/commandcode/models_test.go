@@ -243,6 +243,12 @@ func TestDoGenerate(t *testing.T) {
 	if gotHeaders.Get("User-Agent") != "cli" {
 		t.Errorf("User-Agent = %q, want cli", gotHeaders.Get("User-Agent"))
 	}
+	if gotHeaders.Get("accept-encoding") != "identity" {
+		t.Errorf("accept-encoding = %q, want identity", gotHeaders.Get("accept-encoding"))
+	}
+	if gotHeaders.Get("x-co-flag") != "false" {
+		t.Errorf("x-co-flag = %q, want false", gotHeaders.Get("x-co-flag"))
+	}
 	if gotHeaders.Get("Authorization") != "Bearer "+account.APIKey {
 		t.Errorf("Authorization = %q", gotHeaders.Get("Authorization"))
 	}

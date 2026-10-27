@@ -119,7 +119,8 @@ func TestAcceptance(t *testing.T) {
 		t.Error("upstream request must be streamed")
 	}
 	config, _ := seenEnvelope["config"].(map[string]any)
-	if config["workingDir"] != DefaultProjectDir || config["environment"] != DefaultPlatform {
+	environment, _ := config["environment"].(string)
+	if config["workingDir"] != DefaultProjectDir || !strings.Contains(environment, DefaultPlatform+"-"+DefaultArch) || !strings.Contains(environment, "Node.js ") {
 		t.Errorf("device profile not applied: %v", config)
 	}
 

@@ -45,6 +45,7 @@ type streamTranslator struct {
 	usage         usageInfo
 	sawFinish     bool
 	sawContent    bool
+	sawDone       bool
 	upstreamErr   *UpstreamError
 }
 
@@ -52,19 +53,45 @@ func newStreamTranslator(completionID, model string, created int64) *streamTrans
 	return &streamTranslator{completionID: completionID, model: model, created: created}
 }
 
+// maxSSEDataPrefixes bounds repeated "data:" peeling. The upstream emits one
+// prefix; the extra allowance tolerates a malformed terminal wrapper without
+// turning a hostile line into an unbounded loop.
+const maxSSEDataPrefixes = 8
+
+// nextSSEDataPayload strips SSE framing from one line and reports whether the
+// payload was present and whether it is the terminal [DONE] sentinel.
+func nextSSEDataPayload(line []byte) (payload []byte, found bool, done bool) {
+	payload = bytes.TrimSpace(line)
+	if len(payload) == 0 || bytes.HasPrefix(payload, []byte(":")) || bytes.HasPrefix(payload, []byte("event:")) {
+		return nil, false, false
+	}
+	for i := 0; i <= maxSSEDataPrefixes; i++ {
+		if !bytes.HasPrefix(payload, []byte("data:")) {
+			if found && bytes.Equal(payload, []byte("[DONE]")) {
+				return nil, true, true
+			}
+			return payload, true, false
+		}
+		found = true
+		payload = bytes.TrimSpace(payload[len("data:"):])
+		if len(payload) == 0 {
+			return nil, false, false
+		}
+	}
+	return nil, found, false
+}
+
 // translateLine converts one upstream line into at most one chunk payload.
 // Malformed or non-JSON lines are ignored: a keepalive or comment must never
 // abort a healthy stream.
 func (t *streamTranslator) translateLine(line []byte) ([]byte, bool) {
-	trimmed := bytes.TrimSpace(line)
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("[DONE]")) || bytes.HasPrefix(trimmed, []byte(":")) {
+	trimmed, found, done := nextSSEDataPayload(line)
+	if done {
+		t.sawDone = true
 		return nil, false
 	}
-	if bytes.HasPrefix(trimmed, []byte("data:")) {
-		trimmed = bytes.TrimSpace(trimmed[len("data:"):])
-		if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("[DONE]")) {
-			return nil, false
-		}
+	if !found || len(trimmed) == 0 {
+		return nil, false
 	}
 
 	var event struct {
@@ -339,7 +366,11 @@ func (t *streamTranslator) consumeUpstream(body io.Reader, idle time.Duration, e
 				}
 				return result.err
 			}
-			if chunk, ok := t.translateLine(result.line); ok && chunk != nil {
+			chunk, ok := t.translateLine(result.line)
+			if t.sawDone {
+				return nil
+			}
+			if ok && chunk != nil {
 				if !emit(chunk) {
 					return errClientGone
 				}

@@ -76,3 +76,48 @@ func TestUpstreamIdleAfterFirstLineUsesTheSameTimer(t *testing.T) {
 		t.Fatalf("err = %v, want the inter-chunk idle error", err)
 	}
 }
+
+func TestTranslateLineAcceptsRepeatedDataDoneMarker(t *testing.T) {
+	for _, line := range []string{
+		"data:[DONE]",
+		"data: [DONE]",
+		"data: data: [DONE]",
+		"data: data:data:[DONE]",
+	} {
+		translator := newStreamTranslator("chatcmpl-test", "m", 1)
+		chunk, ok := translator.translateLine([]byte(line))
+		if ok || chunk != nil {
+			t.Errorf("translateLine(%q) = (%q, %v), want no chunk", line, chunk, ok)
+		}
+		if !translator.sawDone {
+			t.Errorf("translateLine(%q) did not mark the stream as done", line)
+		}
+	}
+}
+
+func TestConsumeUpstreamStopsAfterRepeatedDataDoneMarker(t *testing.T) {
+	reader, writer := io.Pipe()
+	go func() {
+		_, _ = io.WriteString(writer, "{\"type\":\"text-delta\",\"text\":\"before\"}\n")
+		_, _ = io.WriteString(writer, "data: data: [DONE]\n")
+		_, _ = io.WriteString(writer, "{\"type\":\"text-delta\",\"text\":\"after\"}\n")
+		_ = writer.Close()
+	}()
+	t.Cleanup(func() { _ = writer.Close() })
+
+	translator := newStreamTranslator("chatcmpl-test", "m", 1)
+	var emitted []string
+	err := translator.consumeUpstream(reader, time.Second, func(chunk []byte) bool {
+		emitted = append(emitted, string(chunk))
+		return true
+	})
+	if err != nil {
+		t.Fatalf("consumeUpstream error = %v", err)
+	}
+	if len(emitted) != 1 || !strings.Contains(emitted[0], "before") {
+		t.Fatalf("emitted = %q, want only the pre-terminator chunk", emitted)
+	}
+	if !translator.sawDone {
+		t.Fatal("translator did not record the done marker")
+	}
+}
